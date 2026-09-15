@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met doorlopende live autocomplete voor elke letter
+# 2. Zoekbalk met volledige autocomplete voor álle letters en ruime weergave
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -128,7 +128,7 @@ search_html = """
     stroke-linejoin: round;
   }
 
-  /* Suggesties Dropdown */
+  /* Ruime suggesties Dropdown met scrollfunctie */
   .suggestions-dropdown {
     display: none;
     position: absolute;
@@ -138,11 +138,10 @@ search_html = """
     background: #ffffff;
     border-radius: 16px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-    overflow: hidden;
+    overflow-y: auto;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
-    max-height: 250px;
-    overflow-y: auto;
+    max-height: 260px;
   }
 
   .suggestion-item {
@@ -193,7 +192,7 @@ search_html = """
 </div>
 
 <script>
-  // Uitgebreide lijst met locaties voor vloeiende autocomplete bij elke letter
+  // Uitgebreide lijst met locaties
   const mockLocations = [
     "Brussel, Centrum",
     "Brussel-Zuid Station",
@@ -217,7 +216,7 @@ search_html = """
   const input = document.getElementById('searchInput');
   const suggestionsBox = document.getElementById('suggestions');
 
-  // Trigger live filtering op elk type-event (input) voor alle letters
+  // Dynamische filtering voor elke letter die getyped wordt
   input.addEventListener('input', function() {
     const query = input.value.trim().toLowerCase();
     
@@ -226,7 +225,7 @@ search_html = """
       return;
     }
 
-    // Filter locaties waarbij elk getypte teken ergens in de naam voorkomt
+    // Filter doorlopend op basis van de ingevoerde tekst
     const filtered = mockLocations.filter(loc => loc.toLowerCase().includes(query));
     
     if (filtered.length > 0) {
@@ -244,7 +243,7 @@ search_html = """
     }
   });
 
-  // Klik buiten de zoekbalk verbergt de suggesties
+  // Klik buiten de zoekbalk sluit de suggesties
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrapper')) {
       suggestionsBox.style.display = 'none';
@@ -277,5 +276,5 @@ search_html = """
 </html>
 """
 
-# Render de component
-components.html(search_html, height=120, scrolling=False)
+# Belangrijk: height=350 zorgt ervoor dat de dropdown nooit meer wordt afgekapt!
+components.html(search_html, height=350, scrolling=False)
