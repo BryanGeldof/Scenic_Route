@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Strakke Waze Glassmorphism Styling
+# CSS om het volledige kader/achtergrondvlak volledig onzichtbaar te maken
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,37 +43,36 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Posysionering van de Streamlit container als één strak paneel linksboven */
+    /* Posysionering linksboven */
     .element-container {
         position: fixed !important;
-        top: 24px !important;
-        left: 24px !important;
+        top: 20px !important;
+        left: 20px !important;
         z-index: 99999 !important;
-        width: 360px !important;
+        width: 340px !important;
     }
 
-    /* Het glazen paneel om de widgets heen */
+    /* WIS HET KADER: Maak de achtergrondcontainer volledig transparant en randloos */
     div[data-testid="stVerticalBlock"] > div:first-child {
-        background: rgba(15, 23, 42, 0.88);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        padding: 24px;
-        border-radius: 24px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
     }
 
     /* Strakke invoervelden */
     .stTextInput input {
-        background-color: rgba(30, 41, 59, 0.95) !important;
+        background-color: rgba(15, 23, 42, 0.9) !important;
         color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
         border-radius: 12px !important;
         padding: 10px 14px 10px 36px !important;
         font-size: 14px !important;
     }
 
-    /* Strakke knop in Waze stijl */
+    /* Strakke knop */
     .stButton>button {
         background: linear-gradient(135deg, #0ea5e9 0%, #2563eb) !important;
         color: white !important;
@@ -85,17 +84,17 @@ st.markdown("""
         width: 100% !important;
         box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4) !important;
         cursor: pointer;
-        margin-top: 8px;
+        margin-top: 4px;
     }
 
     .stButton>button:hover {
         background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8) !important;
-        transform: translateY(-1px);
     }
 
     .stCheckbox label {
-        color: #cbd5e1 !important;
+        color: #ffffff !important;
         font-size: 13px !important;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -110,10 +109,10 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Één geïntegreerd paneel met titel, zoekveld, checkbox en knop
+# 2. Invoer elementen zonder enig achtergrondkader
 with st.container():
-    st.markdown("### 🗺️ Scenic Navigator")
-    st.markdown("<p style='font-size: 12px; color: #94a3b8; margin-top: -10px; margin-bottom: 12px;'>Plan je route of schilderachtige lus</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 0px;'>🗺️ Scenic Navigator</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 12px; color: #cbd5e1; text-shadow: 0 1px 3px rgba(0,0,0,0.8); margin-top: 2px; margin-bottom: 8px;'>Plan je route of schilderachtige lus</p>", unsafe_allow_html=True)
     
     search_query = st.text_input("Bestemming", placeholder="🔍 Typ bestemming of adres...", label_visibility="collapsed")
     is_loop = st.checkbox("🔄 Maak schilderachtige lus vanaf locatie")
