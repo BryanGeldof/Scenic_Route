@@ -1,6 +1,4 @@
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
 import streamlit.components.v1 as components
 
 # Pagina configuratie
@@ -11,96 +9,61 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ontvang coördinaten via query parameters als de JavaScript kaart ze doorstuurt
-query_params = st.query_params
-lat = float(query_params.get("lat", 50.8280))
-lon = float(query_params.get("lon", 3.2648))
-
-dest_lat = query_params.get("dest_lat", None)
-dest_lon = query_params.get("dest_lon", None)
-is_loop = query_params.get("loop", "false") == "true"
-
-# 1. Achtergrond Kaart initialiseren met dynamische markers
-m = folium.Map(
-    location=[lat, lon], 
-    zoom_start=13,
-    tiles="OpenStreetMap",
-    zoom_control=False,
-    attributionControl=False
-)
-
-# Zwarte marker voor vertrekpunt
-folium.Marker(
-    [lat, lon],
-    popup="Vertrekpunt",
-    icon=folium.DivIcon(html="""
-        <div style="background-color: #1e293b; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-            <div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div>
-        </div>
-    """)
-).add_to(m)
-
-# Bestemmingsmarker (Wit) enkel toevoegen als het geen lus is en er coördinaten zijn
-if not is_loop and dest_lat and dest_lon:
-    folium.Marker(
-        [float(dest_lat), float(dest_lon)],
-        popup="Bestemming",
-        icon=folium.DivIcon(html="""
-            <div style="background-color: #ffffff; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-                <div style="width: 8px; height: 8px; background: #1e293b; border-radius: 50%;"></div>
-            </div>
-        """)
-    ).add_to(m)
-
-# Render de kaart op de achtergrond via een container
-with st.container():
-    st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        .stApp {
-            background-color: #0b0f19;
-            overflow: hidden;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .block-container {
-            padding: 0 !important;
-            margin: 0 !important;
-            max-width: 100% !important;
-            height: 100vh !important;
-            overflow: hidden !important;
-        }
-        
-        iframe {
-            width: 100vw !important;
-            height: 100vh !important;
-            border: none !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            z-index: 0;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    st_folium(m, use_container_width=True, height=900)
+    .stApp {
+        background-color: #0b0f19;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .block-container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# 2. Zoekbalk, uitklapmenu met locatie-iconen én centrale route-popup
-search_html = """
+# Volledige Leaflet kaart + Zoekinterface in één strakke component met vrije scroll/zoom
+app_html = """
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  #map {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+  }
+
   .search-wrapper {
     position: fixed;
     top: 24px;
     right: 24px;
     z-index: 99999;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     width: 410px;
   }
 
@@ -113,6 +76,7 @@ search_html = """
     border-radius: 50px;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
     padding-left: 18px;
+    box-sizing: border-box;
   }
 
   .search-icon-badge {
@@ -537,6 +501,8 @@ search_html = """
 </head>
 <body>
 
+<div id="map"></div>
+
 <div class="search-wrapper">
   <div class="search-container" id="mainSearchContainer" style="position: relative;">
     <div class="search-icon-badge">
@@ -629,6 +595,18 @@ search_html = """
 </div>
 
 <script>
+  // Initialiseer Leaflet Kaart
+  let map = L.map('map', { zoomControl: false, attributionControl: false }).setView([50.8280, 3.2648], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+  let startMarker = null;
+  let destMarker = null;
+
+  let userLat = 50.8280;
+  let userLon = 3.2648;
+  let destLat = null;
+  let destLon = null;
+
   const input = document.getElementById('searchInput');
   const destInput = document.getElementById('destInput');
   const startInput = document.getElementById('startInput');
@@ -649,18 +627,48 @@ search_html = """
   const chkLoop = document.getElementById('chkLoop');
 
   let timeoutId = null;
-  let userLat = 50.8280;
-  let userLon = 3.2648;
-  let destLat = null;
-  let destLon = null;
   let activeTargetInput = null;
   let currentPreference = 'time';
 
+  // Update Markers op de kaart
+  function updateMapMarkers() {
+    if (startMarker) map.removeLayer(startMarker);
+    if (destMarker) map.removeLayer(destMarker);
+
+    // Zwarte marker voor vertrek
+    const blackIcon = L.divIcon({
+      className: 'custom-marker',
+      html: '<div style="background-color: #1e293b; width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div></div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+    startMarker = L.marker([userLat, userLon], { icon: blackIcon }).addTo(map);
+
+    // Witte marker voor bestemming (enkel als het geen lus is)
+    if (!chkLoop.checked && destLat && destLon) {
+      const whiteIcon = L.divIcon({
+        className: 'custom-marker',
+        html: '<div style="background-color: #ffffff; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; background: #1e293b; border-radius: 50%;"></div></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      destMarker = L.marker([destLat, destLon], { icon: whiteIcon }).addTo(map);
+
+      // Fit bounds zodat beide markers mooi zichtbaar zijn
+      let group = new L.featureGroup([startMarker, destMarker]);
+      map.fitBounds(group.getBounds(), { padding: [80, 80] });
+    } else {
+      map.setView([userLat, userLon], 13);
+    }
+  }
+
+  // Geolocatie ophalen bijstarten
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         userLat = position.coords.latitude;
         userLon = position.coords.longitude;
+        updateMapMarkers();
         
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1`, {
           headers: { 'Accept-Language': 'nl' }
@@ -693,10 +701,12 @@ search_html = """
         if (data && data.success) {
           userLat = data.latitude;
           userLon = data.longitude;
+          updateMapMarkers();
           startInput.value = data.city ? `${data.city} (Huidige locatie)` : "Huidige locatie";
         }
       })
       .catch(() => {
+        updateMapMarkers();
         startInput.value = "Kortrijk, België";
       });
   }
@@ -725,6 +735,7 @@ search_html = """
       destLat = null;
       destLon = null;
     }
+    updateMapMarkers();
   }
 
   function positionDropdown(targetField) {
@@ -788,10 +799,7 @@ search_html = """
               const name = item.display_name.replace(/'/g, "\\'");
               let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
               
-              let latItem = item.lat;
-              let lonItem = item.lon;
-
-              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${latItem}, ${lonItem})">
+              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${item.lat}, ${item.lon})">
                          <div class="suggestion-content">
                            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
@@ -839,15 +847,16 @@ search_html = """
       if (activeTargetInput === input && !chkLoop.checked) {
         input.value = val;
         destInput.value = val;
-        destLat = latVal;
-        destLon = lonVal;
+        destLat = parseFloat(latVal);
+        destLon = parseFloat(lonVal);
       } else if (activeTargetInput === destInput) {
-        destLat = latVal;
-        destLon = lonVal;
+        destLat = parseFloat(latVal);
+        destLon = parseFloat(lonVal);
       } else if (activeTargetInput === startInput) {
-        userLat = latVal;
-        userLon = lonVal;
+        userLat = parseFloat(latVal);
+        userLon = parseFloat(lonVal);
       }
+      updateMapMarkers();
     }
     suggestionsBox.style.display = 'none';
   }
@@ -869,6 +878,9 @@ search_html = """
       destLon = userLon;
     } else {
       modalSubtitle.innerText = "Hoe wil je dat de route berekend wordt?";
+      if (dest === '' && mainVal !== '') {
+        destInput.value = mainVal;
+      }
     }
 
     suggestionsBox.style.display = 'none';
@@ -903,16 +915,25 @@ search_html = """
 
   function startNavigation() {
     const isLoop = chkLoop.checked;
-    closeRouteModal();
+    const start = startInput.value;
+    const dest = destInput.value;
+    const avoidHighways = document.getElementById('chkHighways').checked;
+    const avoidTolls = document.getElementById('chkTolls').checked;
+    const avoidFerries = document.getElementById('chkFerries').checked;
+    const routeAmount = routeValueInput.value;
 
-    // Stuur coördinaten mee om de map te updaten met markers
-    let params = `?lat=${userLat}&lon=${userLon}&loop=${isLoop}`;
-    if (!isLoop && destLat && destLon) {
-      params += `&dest_lat=${destLat}&dest_lon=${destLon}`;
-    } else {
-      params += `&dest_lat=${userLat}&dest_lon=${userLon}`;
-    }
-    window.location.search = params;
+    console.log("NAVIGATIE GESTART:", {
+      start,
+      dest: isLoop ? "(Lus / Rondrit)" : dest,
+      optimization: currentPreference,
+      amount: routeAmount + " " + unitLabel.innerText,
+      isLoop,
+      avoidHighways,
+      avoidTolls,
+      avoidFerries
+    });
+
+    closeRouteModal();
   }
 </script>
 
@@ -920,4 +941,4 @@ search_html = """
 </html>
 """
 
-components.html(search_html, height=520, scrolling=False)
+components.html(app_html, height=900, scrolling=False)
