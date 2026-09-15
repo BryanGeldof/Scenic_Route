@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Strakke styling voor het formulier en de zoekbalk
+# Strakke styling: formulier vastzetten als compacte zoekbalk
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,28 +43,36 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Maak van het formulier één strakke witte zoekbalk rechtsboven */
+    /* Zet het formulier vast als een compacte, strakke balk rechtsboven */
     div[data-testid="stForm"] {
         position: fixed !important;
         top: 20px !important;
         right: 20px !important;
         z-index: 99999 !important;
         width: 380px !important;
+        height: 56px !important;
         background: #ffffff !important;
         padding: 6px 10px !important;
         border-radius: 14px !important;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
         border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        overflow: hidden !important;
         pointer-events: auto !important;
     }
 
-    /* Verberg standaard randen van het invoerveld binnen het formulier */
+    /* Zorg dat de kolommen binnen het formulier netjes naast elkaar staan */
+    div[data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    /* Strak invoerveld zonder randen */
     .stTextInput input {
         background-color: transparent !important;
         color: #0f172a !important;
         border: none !important;
         box-shadow: none !important;
-        padding: 8px 4px !important;
+        padding: 6px 4px !important;
         font-size: 15px !important;
         outline: none !important;
     }
@@ -82,9 +90,10 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Strakke verzendknop met ingebouwd wit vergrootglas */
+    /* Compacte verzendknop met ingebouwd wit vergrootglas */
     .stFormSubmitButton {
-        margin-top: 2px !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     .stFormSubmitButton button {
@@ -118,7 +127,7 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk als Formulier (zodat je zorgeloos kunt typen zonder dat de focus verspringt)
+# 2. Zoekbalk als compact formulier (zodat je probleemloos kunt typen)
 with st.form(key="search_form"):
     col1, col2 = st.columns([5, 1])
     with col1:
