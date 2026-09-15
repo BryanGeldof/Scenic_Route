@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Styling voor de perfecte pil-vormige zoekbalk rechtsboven
+# Strakke Styling: Rechthoekig zoekveld met afgeronde hoeken en wit vergrootglas-icoon
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,7 +43,7 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Posysionering van het zoekelement rechtsboven */
+    /* Posysionering rechtsboven */
     .element-container {
         position: fixed !important;
         top: 24px !important;
@@ -53,15 +53,15 @@ st.markdown("""
         width: 380px !important;
     }
 
-    /* Pil-vormig inputveld met ruimte aan de rechterkant voor de knop */
+    /* Rechthoekig zoekveld met mooi afgeronde hoeken (geen ovaal/pil) */
     .stTextInput input {
         background-color: #ffffff !important;
         color: #1e293b !important;
-        border: none !important;
-        border-radius: 50px !important;
-        padding: 14px 70px 14px 24px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        padding: 12px 55px 12px 16px !important;
         font-size: 15px !important;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
         outline: none !important;
     }
 
@@ -73,7 +73,7 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Zet de knop exact aan de RECHTERKANT in de pil */
+    /* De knop met een strak wit vergrootglas (cirkel + handvat) erin verwerkt */
     .stButton {
         position: absolute !important;
         right: 6px !important;
@@ -83,23 +83,22 @@ st.markdown("""
 
     .stButton>button {
         background-color: #1e293b !important;
-        color: white !important;
-        border-radius: 50% !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        color: transparent !important;
+        border-radius: 8px !important;
         border: none !important;
-        width: 40px !important;
-        height: 40px !important;
+        width: 38px !important;
+        height: 38px !important;
         padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
         cursor: pointer !important;
-        font-size: 15px !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+        transition: background-color 0.2s ease;
     }
 
     .stButton>button:hover {
         background-color: #0f172a !important;
-        transform: scale(1.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -114,10 +113,10 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk rechtsboven met de knop netjes rechts ingebouwd
+# 2. Zoekbalk rechtsboven met het witte vergrootglas
 with st.container():
     search_query = st.text_input("Zoeken", placeholder="Search...", label_visibility="collapsed")
     
-    if st.button("🔍") or search_query:
+    if st.button("Zoek") or search_query:
         if search_query:
             st.toast(f"🚀 Route gestart naar: {search_query}", icon="🗺️")
