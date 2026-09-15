@@ -143,7 +143,7 @@ with col2:
         st.markdown(f"""
         <div class="card">
             <p><b>Geschatte Afstand:</b> {estimated_km} km</p>
-            <p><b>Type Route:</b> {'Ronde (Lus)' if is_loop / else 'Van A naar B'}</p>
+            <p><b>Type Route:</b> {'Ronde (Lus)' if is_loop else 'Van A naar B'}</p>
             <p><b>Vervoer:</b> {transport_mode}</p>
             <p><b>Hoogtemeters:</b> ca. +45m / -45m</p>
             <p><b>Geschatte Duur:</b> {round(estimated_km / (15 if 'Fietsen' in transport_mode else (4.5 if 'Wandelen' in transport_mode else 50)) * 60)} minuten</p>
