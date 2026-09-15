@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met uitklapbaar opties-paneel & autocomplete op beide velden
+# 2. Zoekbalk met echte browser-geolocatie voor het beginpunt
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -232,7 +232,7 @@ search_html = """
 
   .option-group {
     margin-bottom: 14px;
-    position: relative; /* Nodig om suggesties onder dit veld te positioneren indien gewenst */
+    position: relative;
   }
 
   .option-group label {
@@ -312,7 +312,7 @@ search_html = """
   <div id="optionsPanel" class="options-panel">
     <div class="option-group">
       <label>Beginpunt</label>
-      <input type="text" id="startInput" class="option-input" placeholder="Beginpunt..." autocomplete="off">
+      <input type="text" id="startInput" class="option-input" value="Locatie ophalen..." autocomplete="off">
     </div>
     
     <div class="option-group">
@@ -349,21 +349,56 @@ search_html = """
   let timeoutId = null;
   let userLat = 50.8280;
   let userLon = 3.2648;
-  let activeTargetInput = null; // Houdt bij in welk veld we aan het typen zijn
+  let activeTargetInput = null;
 
-  // Haal IP-locatie op en vul standaard in bij het beginpunt
-  fetch('https://ipwho.is/')
-    .then(response => response.json())
-    .then(data => {
-      if (data && data.success) {
-        userLat = data.latitude;
-        userLon = data.longitude;
-        startInput.value = data.city ? `${data.city} (Huidige locatie)` : "Huidige locatie";
-      }
-    })
-    .catch(err => {
-      console.log("IP-locatie laden mislukt.");
-    });
+  // VRAAG TOESTEMMING AAN APPARAAT VOOR GPS-LOCATIE
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        userLat = position.coords.latitude;
+        userLon = position.coords.longitude;
+        
+        // Vraag bijhorende adres op via Reverse Geocoding van OpenStreetMap
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1`, {
+          headers: { 'Accept-Language': 'nl' }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.display_name) {
+            startInput.value = data.display_name;
+          } else {
+            startInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+          }
+        })
+        .catch(() => {
+          startInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+        });
+      },
+      (error) => {
+        console.log("Geolocatie geweigerd of mislukt, val terug op IP-locatie.");
+        fallbackIpLocation();
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  } else {
+    fallbackIpLocation();
+  }
+
+  // Fallback op IP-locatie als browser GPS weigert
+  function fallbackIpLocation() {
+    fetch('https://ipwho.is/')
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.success) {
+          userLat = data.latitude;
+          userLon = data.longitude;
+          startInput.value = data.city ? `${data.city} (Huidige locatie)` : "Huidige locatie";
+        }
+      })
+      .catch(() => {
+        startInput.value = "Kortrijk, België";
+      });
+  }
 
   // Uitklaplogica met pijl rotatie
   expandBtn.addEventListener('click', () => {
@@ -382,7 +417,6 @@ search_html = """
     const query = queryField.value.trim();
     activeTargetInput = queryField;
 
-    // Synchroniseer hoofdzoekbalk en destInput met elkaar als ze veranderd worden
     if (queryField === input) {
       destInput.value = input.value;
     } else if (queryField === destInput) {
@@ -434,7 +468,6 @@ search_html = """
     }, 250);
   }
 
-  // Event Listeners voor ALLE drie de invoervelden (hoofd, bestemming én beginpunt)
   input.addEventListener('input', () => handleInputTyping(input));
   destInput.addEventListener('input', () => handleInputTyping(destInput));
   startInput.addEventListener('input', () => handleInputTyping(startInput));
@@ -481,7 +514,6 @@ search_html = """
   function selectSuggestion(val) {
     if (activeTargetInput) {
       activeTargetInput.value = val;
-      // Als er in de hoofdzoekbalk of destInput geklikt wordt, synchroniseer ze
       if (activeTargetInput === input || activeTargetInput === destInput) {
         input.value = val;
         destInput.value = val;
