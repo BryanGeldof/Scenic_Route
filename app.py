@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk, uitklapmenu én de centrale route-popup (modal)
+# 2. Zoekbalk, uitklapmenu én de centrale route-popup met waardeselector
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -288,7 +288,7 @@ search_html = """
     cursor: pointer;
   }
 
-  /* CENTRALE POPUP (MODAL OVER HET SCHERM) */
+  /* CENTRALE POPUP (MODAL) */
   .modal-overlay {
     display: none;
     position: fixed;
@@ -331,13 +331,13 @@ search_html = """
   .modal-subtitle {
     font-size: 13px;
     color: #64748b;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
   .preference-container {
     display: flex;
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
   }
 
   .pref-option {
@@ -346,7 +346,7 @@ search_html = """
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 14px;
+    padding: 12px;
     border: 2px solid #e2e8f0;
     border-radius: 14px;
     cursor: pointer;
@@ -366,14 +366,13 @@ search_html = """
   }
 
   .pref-option svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     stroke: #64748b;
     stroke-width: 2;
     fill: none;
   }
 
-  /* Actieve selectie styling */
   .pref-option.selected {
     border-color: #1e293b;
     background: #f1f5f9;
@@ -382,6 +381,48 @@ search_html = """
   .pref-option.selected svg, .pref-option.selected span {
     color: #1e293b;
     stroke: #1e293b;
+  }
+
+  /* Invoer sectie voor aantal uur / km met up/down pijltjes */
+  .value-input-group {
+    margin-bottom: 20px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 12px 16px;
+  }
+
+  .value-input-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .number-input-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .number-input-wrapper input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    outline: none;
+  }
+
+  .unit-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    margin-left: 8px;
   }
 
   .depart-btn {
@@ -490,6 +531,15 @@ search_html = """
       </label>
     </div>
 
+    <!-- Dynamische waarde selector (Aantal uur / kilometer met up/down pijltjes) -->
+    <div class="value-input-group">
+      <label id="valueLabel">Gewenste duur</label>
+      <div class="number-input-wrapper">
+        <input type="number" id="routeValueInput" value="1.0" min="0.25" max="24" step="0.25">
+        <span class="unit-label" id="unitLabel">uur</span>
+      </div>
+    </div>
+
     <button class="depart-btn" onclick="startNavigation()">Vertrek</button>
   </div>
 </div>
@@ -507,6 +557,10 @@ search_html = """
   const startGroup = document.getElementById('startGroup');
   const destGroup = document.getElementById('destGroup');
   const routeModal = document.getElementById('routeModal');
+  
+  const routeValueInput = document.getElementById('routeValueInput');
+  const valueLabel = document.getElementById('valueLabel');
+  const unitLabel = document.getElementById('unitLabel');
 
   let timeoutId = null;
   let userLat = 50.8280;
@@ -560,7 +614,6 @@ search_html = """
       });
   }
 
-  // Uitklaplogica met pijl rotatie
   expandBtn.addEventListener('click', () => {
     const isOpen = optionsPanel.style.display === 'block';
     if (isOpen) {
@@ -708,7 +761,6 @@ search_html = """
     suggestionsBox.style.display = 'none';
   }
 
-  // LOGICA VOOR DE POPUP (MODAL)
   function openRouteModal() {
     const dest = destInput.value.trim();
     if (dest === '') {
@@ -723,6 +775,7 @@ search_html = """
     routeModal.style.display = 'none';
   }
 
+  // Schakelt logica om of we op Tijd of Afstand optimaliseren
   function setPreference(pref) {
     currentPreference = pref;
     document.getElementById('optTime').classList.remove('selected');
@@ -730,8 +783,18 @@ search_html = """
 
     if (pref === 'time') {
       document.getElementById('optTime').classList.add('selected');
+      valueLabel.innerText = "Gewenste duur";
+      unitLabel.innerText = "uur";
+      routeValueInput.value = "1.0";
+      routeValueInput.step = "0.25";
+      routeValueInput.min = "0.25";
     } else {
       document.getElementById('optDistance').classList.add('selected');
+      valueLabel.innerText = "Gewenste afstand";
+      unitLabel.innerText = "km";
+      routeValueInput.value = "50";
+      routeValueInput.step = "5";
+      routeValueInput.min = "1";
     }
   }
 
@@ -742,11 +805,13 @@ search_html = """
     const avoidHighways = document.getElementById('chkHighways').checked;
     const avoidTolls = document.getElementById('chkTolls').checked;
     const avoidFerries = document.getElementById('chkFerries').checked;
+    const routeAmount = routeValueInput.value;
 
     console.log("NAVIGATIE GESTART:", {
       start,
       dest,
       optimization: currentPreference,
+      amount: routeAmount + " " + unitLabel.innerText,
       isLoop,
       avoidHighways,
       avoidTolls,
