@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Strakke styling voor de kaart en de perfecte zoekbalk rechtsboven
+# Strakke styling met actieve focus voor het invoerveld
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,7 +43,7 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Posysionering van de totale zoekbalk container strak rechtsboven */
+    /* Posysionering van de zoekbalk container rechtsboven met actieve muisinteractie */
     .element-container {
         position: fixed !important;
         top: 20px !important;
@@ -51,18 +51,24 @@ st.markdown("""
         left: auto !important;
         z-index: 99999 !important;
         width: 380px !important;
+        pointer-events: auto !important;
     }
 
-    /* Maak van de container één strakke witte balk met afgeronde hoeken en schaduw */
+    /* De witte balk container */
     div[data-testid="stVerticalBlock"] > div:first-child {
         background: #ffffff !important;
         padding: 6px 10px !important;
         border-radius: 14px !important;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
         border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        pointer-events: auto !important;
     }
 
-    /* Verberg de standaard randen en achtergrond van het tekstveld */
+    /* Zorg dat het tekstveld volledig klikbaar en focusbaar is */
+    .stTextInput {
+        pointer-events: auto !important;
+    }
+
     .stTextInput input {
         background-color: transparent !important;
         color: #0f172a !important;
@@ -70,6 +76,13 @@ st.markdown("""
         box-shadow: none !important;
         padding: 8px 4px !important;
         font-size: 15px !important;
+        pointer-events: auto !important;
+        outline: none !important;
+    }
+
+    .stTextInput input:focus {
+        border: none !important;
+        box-shadow: none !important;
     }
 
     .stTextInput input::placeholder {
@@ -81,6 +94,10 @@ st.markdown("""
     }
 
     /* Strakke knop met ingebouwd wit vergrootglas */
+    .stButton {
+        pointer-events: auto !important;
+    }
+
     .stButton>button {
         background-color: #0f172a !important;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E") !important;
@@ -103,7 +120,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Kaart initialiseren met schone, gratis OpenStreetMap tiles (geen API-key meldingen meer)
+# 1. Kaart initialiseren met schone OpenStreetMap tiles
 m = folium.Map(
     location=[50.8503, 4.3517], 
     zoom_start=11,
@@ -113,7 +130,7 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk netjes opgebouwd met kolommen voor perfecte uitlijning
+# 2. Zoekbalk met werkende focus en invoer
 with st.container():
     col1, col2 = st.columns([5, 1])
     with col1:
