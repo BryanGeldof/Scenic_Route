@@ -1008,7 +1008,7 @@ app_html = """
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.7;
+      let radiusKm = (targetKm / (2 * Math.PI)) * 0.75;
       let radiusLat = radiusKm / 111;
       let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
@@ -1025,7 +1025,7 @@ app_html = """
         let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
         let waypoints = [`${userLon},${userLat}`];
-        let radiuses = [`50`];
+        let radiuses = [`200`];
 
         let numPoints = 4;
         for (let j = 0; j < numPoints; j++) {
@@ -1033,18 +1033,17 @@ app_html = """
           let pLat = centerLat + (radiusLat * Math.sin(angle));
           let pLon = centerLon + (radiusLon * Math.cos(angle));
           waypoints.push(`${pLon},${pLat}`);
-          radiuses.push(`400`); // 400m tolerantie zodat OSRM doorgaande wegen pakt en woonerven links laat liggen
+          radiuses.push(`500`); // Grote tolerantie dwingt OSRM om doorgaande wegen te pakken i.p.v. woonerven
         }
         waypoints.push(`${userLon},${userLat}`);
-        radiuses.push(`50`);
+        radiuses.push(`200`);
 
         let waypointsStr = waypoints.join(';');
         let radiusesStr = radiuses.join(';');
 
-        // Voeg &exclude=residential toe zodat kleine woonstraten en doodlopende woonerf-structuren worden gemeden
-        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}&exclude=residential`;
+        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}`;
         if (avoidHighways) {
-          url += ",motorway";
+          url += "&exclude=motorway";
         }
 
         try {
@@ -1065,9 +1064,9 @@ app_html = """
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
-      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson&exclude=residential`;
+      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
       if (avoidHighways) {
-        url += ",motorway";
+        url += "&exclude=motorway";
       }
 
       try {
@@ -1092,7 +1091,7 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand of vink autostrades tijdelijk aan.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
       return;
     }
 
