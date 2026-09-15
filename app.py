@@ -11,14 +11,46 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 1. Achtergrond Kaart initialiseren (gecentreerd op Kortrijk/Wevelgem)
+# Ontvang coördinaten via query parameters als de JavaScript kaart ze doorstuurt
+query_params = st.query_params
+lat = float(query_params.get("lat", 50.8280))
+lon = float(query_params.get("lon", 3.2648))
+
+dest_lat = query_params.get("dest_lat", None)
+dest_lon = query_params.get("dest_lon", None)
+is_loop = query_params.get("loop", "false") == "true"
+
+# 1. Achtergrond Kaart initialiseren met dynamische markers
 m = folium.Map(
-    location=[50.8280, 3.2648], 
-    zoom_start=12,
+    location=[lat, lon], 
+    zoom_start=13,
     tiles="OpenStreetMap",
     zoom_control=False,
     attributionControl=False
 )
+
+# Zwarte marker voor vertrekpunt
+folium.Marker(
+    [lat, lon],
+    popup="Vertrekpunt",
+    icon=folium.DivIcon(html="""
+        <div style="background-color: #1e293b; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div>
+        </div>
+    """)
+).add_to(m)
+
+# Bestemmingsmarker (Wit) enkel toevoegen als het geen lus is en er coördinaten zijn
+if not is_loop and dest_lat and dest_lon:
+    folium.Marker(
+        [float(dest_lat), float(dest_lon)],
+        popup="Bestemming",
+        icon=folium.DivIcon(html="""
+            <div style="background-color: #ffffff; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 8px; height: 8px; background: #1e293b; border-radius: 50%;"></div>
+            </div>
+        """)
+    ).add_to(m)
 
 # Render de kaart op de achtergrond via een container
 with st.container():
@@ -83,7 +115,6 @@ search_html = """
     padding-left: 18px;
   }
 
-  /* Locatie icoon in hoofdzoekbalk (Wit op donker rondje of passend) */
   .search-icon-badge {
     width: 32px;
     height: 32px;
@@ -118,7 +149,6 @@ search_html = """
     font-weight: 300;
   }
 
-  /* Uitklapknop (pijltje) */
   .expand-btn {
     background: transparent;
     border: none;
@@ -170,7 +200,6 @@ search_html = """
     stroke-linejoin: round;
   }
 
-  /* Universele Suggesties Dropdown */
   .suggestions-dropdown {
     display: none;
     position: absolute;
@@ -231,7 +260,6 @@ search_html = """
     font-weight: 500;
   }
 
-  /* Uitklapbaar Opties Venster */
   .options-panel {
     display: none;
     background: #ffffff;
@@ -274,7 +302,6 @@ search_html = """
     background: #ffffff;
   }
 
-  /* Zwart pijltje voor vertrek / Wit pijltje voor bestemming */
   .field-icon {
     width: 22px;
     height: 22px;
@@ -339,7 +366,6 @@ search_html = """
     cursor: pointer;
   }
 
-  /* CENTRALE POPUP (MODAL) */
   .modal-overlay {
     display: none;
     position: fixed;
@@ -512,10 +538,8 @@ search_html = """
 <body>
 
 <div class="search-wrapper">
-  <!-- Hoofdzoekbalk container met wit locatie-icoon -->
   <div class="search-container" id="mainSearchContainer" style="position: relative;">
     <div class="search-icon-badge">
-      <!-- Wit locatiepijltje -->
       <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
     </div>
     <input type="text" id="searchInput" class="search-input" placeholder="Waar wil je naartoe?" autocomplete="off">
@@ -530,9 +554,7 @@ search_html = """
     </button>
   </div>
 
-  <!-- Uitklapbaar venster -->
   <div id="optionsPanel" class="options-panel">
-    <!-- Startpunt met ZWART locatiepijltje -->
     <div class="option-group" id="startGroup">
       <label>Vertrekpunt</label>
       <div class="input-with-icon">
@@ -543,7 +565,6 @@ search_html = """
       </div>
     </div>
     
-    <!-- Bestemming met WIT locatiepijltje -->
     <div class="option-group" id="destGroup">
       <label>Bestemming</label>
       <div class="input-with-icon">
@@ -571,10 +592,8 @@ search_html = """
   </div>
 </div>
 
-<!-- Universeel suggestievenster -->
 <div id="suggestions" class="suggestions-dropdown"></div>
 
-<!-- CENTRALE POPUP (MODAL) VOOR ROUTE START -->
 <div id="routeModal" class="modal-overlay">
   <div class="modal-card">
     <div class="modal-title">
@@ -597,7 +616,6 @@ search_html = """
       </label>
     </div>
 
-    <!-- Dynamische waarde selector -->
     <div class="value-input-group">
       <label id="valueLabel">Gewenste duur</label>
       <div class="number-input-wrapper">
@@ -633,10 +651,11 @@ search_html = """
   let timeoutId = null;
   let userLat = 50.8280;
   let userLon = 3.2648;
+  let destLat = null;
+  let destLon = null;
   let activeTargetInput = null;
   let currentPreference = 'time';
 
-  // Browser geolocatie ophalen
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -694,13 +713,17 @@ search_html = """
     }
   });
 
-  // Schakelt de weergave van het bestemmingsveld uit als een lus gekozen wordt
   function toggleLoopMode() {
     if (chkLoop.checked) {
       destGroup.style.display = 'none';
-      destInput.value = '';
+      destInput.value = startInput.value;
+      destLat = userLat;
+      destLon = userLon;
     } else {
       destGroup.style.display = 'block';
+      destInput.value = '';
+      destLat = null;
+      destLon = null;
     }
   }
 
@@ -765,8 +788,10 @@ search_html = """
               const name = item.display_name.replace(/'/g, "\\'");
               let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
               
-              // Witte locatiepijltje in de suggestielijst per item
-              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
+              let latItem = item.lat;
+              let lonItem = item.lon;
+
+              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${latItem}, ${lonItem})">
                          <div class="suggestion-content">
                            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
@@ -808,33 +833,20 @@ search_html = """
     }
   });
 
-  input.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      suggestionsBox.style.display = 'none';
-      openRouteModal();
-    }
-  });
-
-  destInput.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      suggestionsBox.style.display = 'none';
-      openRouteModal();
-    }
-  });
-
-  startInput.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-      suggestionsBox.style.display = 'none';
-      openRouteModal();
-    }
-  });
-
-  function selectSuggestion(val) {
+  function selectSuggestion(val, latVal, lonVal) {
     if (activeTargetInput) {
       activeTargetInput.value = val;
       if (activeTargetInput === input && !chkLoop.checked) {
         input.value = val;
         destInput.value = val;
+        destLat = latVal;
+        destLon = lonVal;
+      } else if (activeTargetInput === destInput) {
+        destLat = latVal;
+        destLon = lonVal;
+      } else if (activeTargetInput === startInput) {
+        userLat = latVal;
+        userLon = lonVal;
       }
     }
     suggestionsBox.style.display = 'none';
@@ -852,6 +864,9 @@ search_html = """
     
     if (isLoop) {
       modalSubtitle.innerText = "Hoe lang mag de rondrit duren?";
+      destInput.value = startInput.value;
+      destLat = userLat;
+      destLon = userLon;
     } else {
       modalSubtitle.innerText = "Hoe wil je dat de route berekend wordt?";
     }
@@ -887,26 +902,17 @@ search_html = """
   }
 
   function startNavigation() {
-    const start = startInput.value;
-    const dest = destInput.value;
     const isLoop = chkLoop.checked;
-    const avoidHighways = document.getElementById('chkHighways').checked;
-    const avoidTolls = document.getElementById('chkTolls').checked;
-    const avoidFerries = document.getElementById('chkFerries').checked;
-    const routeAmount = routeValueInput.value;
-
-    console.log("NAVIGATIE GESTART:", {
-      start,
-      dest: isLoop ? "(Lus / Rondrit)" : dest,
-      optimization: currentPreference,
-      amount: routeAmount + " " + unitLabel.innerText,
-      isLoop,
-      avoidHighways,
-      avoidTolls,
-      avoidFerries
-    });
-
     closeRouteModal();
+
+    // Stuur coördinaten mee om de map te updaten met markers
+    let params = `?lat=${userLat}&lon=${userLon}&loop=${isLoop}`;
+    if (!isLoop && destLat && destLon) {
+      params += `&dest_lat=${destLat}&dest_lon=${destLon}`;
+    } else {
+      params += `&dest_lat=${userLat}&dest_lon=${userLon}`;
+    }
+    window.location.search = params;
   }
 </script>
 
@@ -914,5 +920,4 @@ search_html = """
 </html>
 """
 
-# Render de component
 components.html(search_html, height=520, scrolling=False)
