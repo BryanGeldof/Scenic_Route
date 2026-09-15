@@ -980,9 +980,9 @@ app_html = """
       document.getElementById('optDistance').classList.add('selected');
       valueLabel.innerText = "Gewenste afstand";
       unitLabel.innerText = "km";
-      routeValueInput.value = "50";
+      routeValueInput.value = "30";
       routeValueInput.step = "5";
-      routeValueInput.min = "1";
+      routeValueInput.min = "5";
     }
   }
 
@@ -1008,12 +1008,8 @@ app_html = """
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      // Bepaal de straal van de cirkel op basis van de gewenste afstand
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.8;
-      let radiusLat = radiusKm / 111;
-      let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
-
-      // We maken varianten (Noord, Oost, West) in een Trip-aanvraag
+      // We genereren verschillende schaalgroottes (offset marge) zodat er altijd wel één past
+      let scaleFactors = [1.0, 0.8, 1.2];
       let variations = [
         { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
         { name: "Rondrit Oosten", dirAngle: 0 },
@@ -1022,41 +1018,54 @@ app_html = """
 
       for (let i = 0; i < variations.length; i++) {
         let v = variations[i];
-        let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
-        let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
+        let successForThisDir = false;
 
-        // Genereer punten in een lus, maar we gebruiken de Trip API i.p.v. Route API
-        // De Trip API verbindt punten vloeiend op basis van reizigersprobleem-optimalisatie
-        let coordsList = [`${userLon},${userLat}`];
-        let numPoints = 5;
-        for (let j = 0; j < numPoints; j++) {
-          let angle = j * (2 * Math.PI / numPoints);
-          let pLat = centerLat + (radiusLat * Math.sin(angle));
-          let pLon = centerLon + (radiusLon * Math.cos(angle));
-          coordsList.push(`${pLon},${pLat}`);
-        }
+        for (let s = 0; s < scaleFactors.length && !successForThisDir; s++) {
+          let adjustedKm = targetKm * scaleFactors[s];
+          let radiusKm = (adjustedKm / (2 * Math.PI)) * 0.75;
+          let radiusLat = radiusKm / 111;
+          let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-        let coordsStr = coordsList.join(';');
-        // Gebruik /trip/v1/driving/ ipv /route/v1/driving/
-        let url = `${serverBase}trip/v1/driving/${coordsStr}?roundtrip=true&source=first&destination=first&overview=full&geometries=geojson`;
-        if (avoidHighways) {
-          url += "&exclude=motorway";
-        }
+          let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
+          let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
-        try {
-          let response = await fetch(url);
-          let data = await response.json();
-          if (data.code === "Ok" && data.trips && data.trips.length > 0) {
-            let t = data.trips[0];
-            routeOptions.push({
-              name: v.name,
-              distance: (t.distance / 1000).toFixed(1),
-              duration: (t.duration / 3600).toFixed(1),
-              geometry: t.geometry,
-              color: i === 0 ? '#3b82f6' : (i === 1 ? '#10b981' : '#f59e0b')
-            });
+          let coordsList = [`${userLon},${userLat}`];
+          let numPoints = 4; // 4 punten geeft OSRM meer vrijheid op grotere doorgaande wegen
+          for (let j = 0; j < numPoints; j++) {
+            let angle = j * (2 * Math.PI / numPoints);
+            let pLat = centerLat + (radiusLat * Math.sin(angle));
+            let pLon = centerLon + (radiusLon * Math.cos(angle));
+            coordsList.push(`${pLon},${pLat}`);
           }
-        } catch(e) { console.error(e); }
+
+          let coordsStr = coordsList.join(';');
+          let url = `${serverBase}trip/v1/driving/${coordsStr}?roundtrip=true&source=first&destination=first&overview=full&geometries=geojson`;
+          if (avoidHighways) {
+            url += "&exclude=motorway";
+          }
+
+          try {
+            let response = await fetch(url);
+            let data = await response.json();
+            if (data.code === "Ok" && data.trips && data.trips.length > 0) {
+              let t = data.trips[0];
+              let calcDist = (t.distance / 1000);
+              
+              // Controleer of de route niet dubbel in de lijst staat
+              let exists = routeOptions.some(r => Math.abs(r.distance - calcDist) < 1.0);
+              if (!exists) {
+                routeOptions.push({
+                  name: `${v.name} (${scaleFactors[s] !== 1.0 ? 'marge' : 'ideaal'})`,
+                  distance: calcDist.toFixed(1),
+                  duration: (t.duration / 3600).toFixed(1),
+                  geometry: t.geometry,
+                  color: routeOptions.length === 0 ? '#3b82f6' : (routeOptions.length === 1 ? '#10b981' : '#f59e0b')
+                });
+                successForThisDir = true;
+              }
+            }
+          } catch(e) { console.error(e); }
+        }
       }
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
@@ -1088,7 +1097,7 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen lussen gevonden. Probeer een andere afstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen lussen gevonden binnen deze marge. Probeer een iets grotere of kleinere afstand/tijd.</div>';
       return;
     }
 
