@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Styling om het zoekveld exact rechtsboven te plaatsen in de gewenste pil-vorm
+# Styling voor de perfecte pil-vormige zoekbalk rechtsboven
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,23 +43,23 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Plaats het zoekveld RECHTSBOVEN */
+    /* Posysionering van het zoekelement rechtsboven */
     .element-container {
         position: fixed !important;
         top: 24px !important;
         right: 24px !important;
         left: auto !important;
         z-index: 99999 !important;
-        width: 360px !important;
+        width: 380px !important;
     }
 
-    /* Pil-vormig zoekveld lijkend op je voorbeeld */
+    /* Pil-vormig inputveld met ruimte aan de rechterkant voor de knop */
     .stTextInput input {
         background-color: #ffffff !important;
         color: #1e293b !important;
         border: none !important;
         border-radius: 50px !important;
-        padding: 14px 60px 14px 24px !important;
+        padding: 14px 70px 14px 24px !important;
         font-size: 15px !important;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
         outline: none !important;
@@ -73,11 +73,11 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Stijl de knop zodat deze precies over de rechterkant van de pil valt als vergrootglas-knop */
+    /* Zet de knop exact aan de RECHTERKANT in de pil */
     .stButton {
         position: absolute !important;
-        right: 4px !important;
-        top: 4px !important;
+        right: 6px !important;
+        top: 6px !important;
         z-index: 100000 !important;
     }
 
@@ -86,15 +86,15 @@ st.markdown("""
         color: white !important;
         border-radius: 50% !important;
         border: none !important;
-        width: 44px !important;
-        height: 44px !important;
+        width: 40px !important;
+        height: 40px !important;
         padding: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
         cursor: pointer !important;
-        font-size: 16px !important;
+        font-size: 15px !important;
     }
 
     .stButton>button:hover {
@@ -114,11 +114,10 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk rechtsboven met vergrootglas knop
+# 2. Zoekbalk rechtsboven met de knop netjes rechts ingebouwd
 with st.container():
     search_query = st.text_input("Zoeken", placeholder="Search...", label_visibility="collapsed")
     
-    # De knop fungeert als de ronde vergrootglas-knop rechts in de pil
     if st.button("🔍") or search_query:
         if search_query:
             st.toast(f"🚀 Route gestart naar: {search_query}", icon="🗺️")
