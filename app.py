@@ -11,10 +11,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 1. Achtergrond Kaart initialiseren
+# 1. Achtergrond Kaart initialiseren (nu gecentreerd op de regio Kortrijk/Wevelgem)
 m = folium.Map(
-    location=[50.8503, 4.3517], 
-    zoom_start=11,
+    location=[50.8280, 3.2648], 
+    zoom_start=12,
     tiles="OpenStreetMap",
     zoom_control=False,
     attributionControl=False
@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met automatische IP-locatie & afstandssortering
+# 2. Zoekbalk met IP-gebaseerde afstandssortering
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -215,27 +215,25 @@ search_html = """
   const suggestionsBox = document.getElementById('suggestions');
   let timeoutId = null;
 
-  // Standaard coördinaten (Brussel) als fallback
-  let userLat = 50.8503;
-  let userLon = 4.3517;
+  // Standaard coördinaten ingesteld op de regio Kortrijk/Wevelgem als fallback
+  let userLat = 50.8280;
+  let userLon = 3.2648;
 
-  // Automatisch de locatie bepalen via IP (werkt altijd, ook in iframes en zonder popups!)
+  // Haal IP-locatie op de achtergrond op
   fetch('https://ipwho.is/')
     .then(response => response.json())
     .then(data => {
       if (data && data.success) {
         userLat = data.latitude;
         userLon = data.longitude;
-        console.log("Locatie geladen via IP:", data.city, userLat, userLon);
       }
     })
     .catch(err => {
-      console.log("Kon IP-locatie niet ophalen, standaard coördinaten worden gebruikt.");
+      console.log("IP-locatie kon niet worden geladen.");
     });
 
-  // Haversine formule om de afstand in kilometers te berekenen
   function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Straal van de aarde in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
@@ -256,19 +254,17 @@ search_html = """
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      // OpenStreetMap zoekopdracht
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10`;
       
       fetch(url, { headers: { 'Accept-Language': 'nl' } })
         .then(response => response.json())
         .then(data => {
           if (data && data.length > 0) {
-            // Bereken de afstand ten opzichte van de IP-locatie van de gebruiker
             data.forEach(item => {
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
 
-            // Sorteer direct van dichtbij naar ver weg!
+            // Sorteer van dichtbij naar ver weg
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
@@ -279,7 +275,7 @@ search_html = """
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
                          <div class="suggestion-content">
                            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                           <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
+                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
                          </div>
                          <span class="distance-badge">${distText}</span>
                        </div>`;
