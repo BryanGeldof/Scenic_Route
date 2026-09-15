@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met uitklapbaar opties-paneel
+# 2. Zoekbalk met uitklapbaar opties-paneel & autocomplete op beide velden
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -232,6 +232,7 @@ search_html = """
 
   .option-group {
     margin-bottom: 14px;
+    position: relative; /* Nodig om suggesties onder dit veld te positioneren indien gewenst */
   }
 
   .option-group label {
@@ -307,16 +308,16 @@ search_html = """
   
   <div id="suggestions" class="suggestions-dropdown"></div>
 
-  <!-- Uitklapbaar venster (standaard verborgen) -->
+  <!-- Uitklapbaar venster -->
   <div id="optionsPanel" class="options-panel">
     <div class="option-group">
       <label>Beginpunt</label>
-      <input type="text" id="startInput" class="option-input" value="Huidige locatie">
+      <input type="text" id="startInput" class="option-input" placeholder="Beginpunt..." autocomplete="off">
     </div>
     
     <div class="option-group">
       <label>Bestemming</label>
-      <input type="text" id="destInput" class="option-input" placeholder="Bestemming...">
+      <input type="text" id="destInput" class="option-input" placeholder="Bestemming..." autocomplete="off">
     </div>
 
     <div class="checkbox-group">
@@ -348,6 +349,7 @@ search_html = """
   let timeoutId = null;
   let userLat = 50.8280;
   let userLon = 3.2648;
+  let activeTargetInput = null; // Houdt bij in welk veld we aan het typen zijn
 
   // Haal IP-locatie op en vul standaard in bij het beginpunt
   fetch('https://ipwho.is/')
@@ -375,31 +377,18 @@ search_html = """
     }
   });
 
-  // Synchroniseer hoofdzoekbalk en bestemmingsveld met elkaar
-  input.addEventListener('input', function() {
-    destInput.value = input.value;
-    handleSearchQuery(input.value);
-  });
+  // Functie om OpenStreetMap data op te halen voor een gegeven veld
+  function handleInputTyping(queryField) {
+    const query = queryField.value.trim();
+    activeTargetInput = queryField;
 
-  destInput.addEventListener('input', function() {
-    input.value = destInput.value;
-    handleSearchQuery(destInput.value);
-  });
+    // Synchroniseer hoofdzoekbalk en destInput met elkaar als ze veranderd worden
+    if (queryField === input) {
+      destInput.value = input.value;
+    } else if (queryField === destInput) {
+      input.value = destInput.value;
+    }
 
-  function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  function handleSearchQuery(query) {
-    query = query.trim();
     if (query.length < 2) {
       suggestionsBox.style.display = 'none';
       return;
@@ -445,6 +434,23 @@ search_html = """
     }, 250);
   }
 
+  // Event Listeners voor ALLE drie de invoervelden (hoofd, bestemming én beginpunt)
+  input.addEventListener('input', () => handleInputTyping(input));
+  destInput.addEventListener('input', () => handleInputTyping(destInput));
+  startInput.addEventListener('input', () => handleInputTyping(startInput));
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrapper')) {
       suggestionsBox.style.display = 'none';
@@ -465,9 +471,22 @@ search_html = """
     }
   });
 
+  startInput.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      suggestionsBox.style.display = 'none';
+      triggerSearch();
+    }
+  });
+
   function selectSuggestion(val) {
-    input.value = val;
-    destInput.value = val;
+    if (activeTargetInput) {
+      activeTargetInput.value = val;
+      // Als er in de hoofdzoekbalk of destInput geklikt wordt, synchroniseer ze
+      if (activeTargetInput === input || activeTargetInput === destInput) {
+        input.value = val;
+        destInput.value = val;
+      }
+    }
     suggestionsBox.style.display = 'none';
     triggerSearch();
   }
