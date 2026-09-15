@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met automatische afstandssortering (van dichtbij naar ver weg)
+# 2. Zoekbalk met automatische IP-locatie & afstandssortering
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -215,24 +215,25 @@ search_html = """
   const suggestionsBox = document.getElementById('suggestions');
   let timeoutId = null;
 
-  // Standaard coördinaten (Brussel) als fallback als GPS niet lukt
+  // Standaard coördinaten (Brussel) als fallback
   let userLat = 50.8503;
   let userLon = 4.3517;
 
-  // Vraag de echte locatie van de gebruiker op via de browser
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        userLat = position.coords.latitude;
-        userLon = position.coords.longitude;
-      },
-      (error) => {
-        console.log("Locatie niet gedeeld, standaard coordinaten worden gebruikt.");
+  // Automatisch de locatie bepalen via IP (werkt altijd, ook in iframes en zonder popups!)
+  fetch('https://ipwho.is/')
+    .then(response => response.json())
+    .then(data => {
+      if (data && data.success) {
+        userLat = data.latitude;
+        userLon = data.longitude;
+        console.log("Locatie geladen via IP:", data.city, userLat, userLon);
       }
-    );
-  }
+    })
+    .catch(err => {
+      console.log("Kon IP-locatie niet ophalen, standaard coördinaten worden gebruikt.");
+    });
 
-  // Haversine formule om de afstand in kilometers te berekenen tussen 2 GPS-punten
+  // Haversine formule om de afstand in kilometers te berekenen
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Straal van de aarde in km
     const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -242,7 +243,7 @@ search_html = """
       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Afstand in km
+    return R * c;
   }
 
   input.addEventListener('input', function() {
@@ -255,25 +256,24 @@ search_html = """
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      // Vraag 10 resultaten op via OpenStreetMap
+      // OpenStreetMap zoekopdracht
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10`;
       
       fetch(url, { headers: { 'Accept-Language': 'nl' } })
         .then(response => response.json())
         .then(data => {
           if (data && data.length > 0) {
-            // Bereken de afstand voor elk resultaat t.o.v. de gebruiker
+            // Bereken de afstand ten opzichte van de IP-locatie van de gebruiker
             data.forEach(item => {
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
 
-            // Sorteer van dichtbij naar ver weg (kleine afstand eerst)
+            // Sorteer direct van dichtbij naar ver weg!
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
             data.forEach(item => {
               const name = item.display_name.replace(/'/g, "\\'");
-              // Netjes afronden van de afstand
               let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
               
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
