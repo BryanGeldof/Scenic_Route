@@ -995,19 +995,6 @@ app_html = """
     activeRouteLayers = [];
   }
 
-  async function fetchRouteWithFallback(urlWithoutExclude, urlWithExclude) {
-    try {
-      let response = await fetch(urlWithExclude);
-      if (!response.ok) throw new Error("Filter niet ondersteund");
-      let data = await response.json();
-      if (!data.routes || data.routes.length === 0) throw new Error("Geen routes");
-      return data;
-    } catch (e) {
-      let responseFallback = await fetch(urlWithoutExclude);
-      return await responseFallback.json();
-    }
-  }
-
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
@@ -1021,40 +1008,45 @@ app_html = """
 
     let routeOptions = [];
 
+    // OSRM server die motorway exclusion betrouwbaar ondersteunt
+    let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
+
     if (isLoop) {
-      // Als tijd is gekozen, reken om naar km (uitgaande van gemiddeld 50 km/u op toeristische wegen)
+      // Omrekenen naar km (uitgaande van gemiddeld 50 km/u op toeristische wegen bij tijdvoorkeur)
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      // Bereken de juiste straal voor een driehoekige lus zodat de totale omtrek dicht bij targetKm komt
-      // Omtrek driehoek is ca. 6.5 * radius van de cirkel
-      let radiusKm = targetKm / 6.5;
-      let radiusLat = radiusKm / 111;
-      let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
+      // Een rechthoekige lus heeft 4 zijden. Om de totale omtrek dicht bij targetKm te krijgen,
+      // berekenen we de zijden zodanig dat de omtrek ~targetKm is (rekening houdend met bochten).
+      let sideKm = (targetKm / 4) * 0.85; 
+      let latOffset = sideKm / 111;
+      let lonOffset = sideKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-      // 3 verschillende richtingsvarianten voor de driehoekige lussen
-      let loopVariations = [
-        { name: "Noord-Oost Rondrit", angleOffset: 0 },
-        { name: "Zuidoost Rondrit", angleOffset: (2 * Math.PI) / 3 },
-        { name: "Westelijke Rondrit", angleOffset: (4 * Math.PI) / 3 }
+      // 3 verschillende rechthoekige varianten (andere oriëntatie van de rechthoek)
+      let variations = [
+        { name: "Noord-Oost Lus", dLat1: latOffset, dLon1: 0, dLat2: latOffset, dLon2: lonOffset, dLat3: 0, dLon3: lonOffset },
+        { name: "Noord-West Lus", dLat1: 0, dLon1: -lonOffset, dLat2: latOffset, dLon2: -lonOffset, dLat3: latOffset, dLon3: 0 },
+        { name: "Zuid-Oost Lus", dLat1: 0, dLon1: lonOffset, dLat2: -latOffset, dLon2: lonOffset, dLat3: -latOffset, dLon3: 0 }
       ];
 
-      for (let i = 0; i < loopVariations.length; i++) {
-        let v = loopVariations[i];
+      for (let i = 0; i < variations.length; i++) {
+        let v = variations[i];
         
-        // Drie punten op een cirkel om een mooie driehoek-lus te vormen
-        let p1Lat = userLat + radiusLat * Math.sin(v.angleOffset);
-        let p1Lon = userLon + radiusLon * Math.cos(v.angleOffset);
+        let p1Lat = userLat + v.dLat1;
+        let p1Lon = userLon + v.dLon1;
+        let p2Lat = userLat + v.dLat2;
+        let p2Lon = userLon + v.dLon2;
+        let p3Lat = userLat + v.dLat3;
+        let p3Lon = userLon + v.dLon3;
 
-        let angle2 = v.angleOffset + ((2 * Math.PI) / 3);
-        let p2Lat = userLat + radiusLat * Math.sin(angle2);
-        let p2Lon = userLon + radiusLon * Math.cos(angle2);
-
-        // Volgorde: Start -> Punt 1 -> Punt 2 -> Start (Vormt een echte driehoekige lus)
-        let baseUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${p1Lon},${p1Lat};${p2Lon},${p2Lat};${userLon},${userLat}?overview=full&geometries=geojson`;
-        let excludeUrl = baseUrl + "&exclude=motorway";
+        // Waypoints voor een echte rechthoek: Start -> P1 -> P2 -> P3 -> Start
+        let url = `${serverBase}${userLon},${userLat};${p1Lon},${p1Lat};${p2Lon},${p2Lat};${p3Lon},${p3Lat};${userLon},${userLat}?overview=full&geometries=geojson`;
+        if (avoidHighways) {
+          url += "&exclude=motorway";
+        }
 
         try {
-          let data = await fetchRouteWithFallback(baseUrl, avoidHighways ? excludeUrl : baseUrl);
+          let response = await fetch(url);
+          let data = await response.json();
           if (data.routes && data.routes.length > 0) {
             let r = data.routes[0];
             routeOptions.push({
@@ -1070,11 +1062,14 @@ app_html = """
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
-      let baseUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
-      let excludeUrl = baseUrl + "&exclude=motorway";
+      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
+      if (avoidHighways) {
+        url += "&exclude=motorway";
+      }
 
       try {
-        let data = await fetchRouteWithFallback(baseUrl, avoidHighways ? excludeUrl : baseUrl);
+        let response = await fetch(url);
+        let data = await response.json();
         if (data.routes && data.routes.length > 0) {
           data.routes.forEach((r, index) => {
             routeOptions.push({
@@ -1094,7 +1089,7 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand of vink autostrades tijdelijk aan.</div>';
       return;
     }
 
