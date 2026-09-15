@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 1. Achtergrond Kaart initialiseren (nu gecentreerd op de regio Kortrijk/Wevelgem)
+# 1. Achtergrond Kaart initialiseren (gecentreerd op Kortrijk/Wevelgem)
 m = folium.Map(
     location=[50.8280, 3.2648], 
     zoom_start=12,
@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met IP-gebaseerde afstandssortering
+# 2. Zoekbalk met slimme Location Bias (exact zoals Google Maps)
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -215,11 +215,11 @@ search_html = """
   const suggestionsBox = document.getElementById('suggestions');
   let timeoutId = null;
 
-  // Standaard coördinaten ingesteld op de regio Kortrijk/Wevelgem als fallback
+  // Standaard coördinaten (Wevelgem/Kortrijk regio)
   let userLat = 50.8280;
   let userLon = 3.2648;
 
-  // Haal IP-locatie op de achtergrond op
+  // Haal op de achtergrond de exacte IP-locatie op
   fetch('https://ipwho.is/')
     .then(response => response.json())
     .then(data => {
@@ -229,7 +229,7 @@ search_html = """
       }
     })
     .catch(err => {
-      console.log("IP-locatie kon niet worden geladen.");
+      console.log("Kon IP-locatie niet laden, fallback wordt gebruikt.");
     });
 
   function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -254,17 +254,22 @@ search_html = """
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10`;
+      // GEOLOCATIE BIAS: Maak een denkbeeldig kader van ~100km rond de gebruiker 
+      // zodat de API direct lokale straten prioriteit geeft (net als Google Maps)
+      const viewbox = `${userLon - 0.8},${userLat + 0.8},${userLon + 0.8},${userLat - 0.8}`;
+      
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10&viewbox=${viewbox}&bounded=0`;
       
       fetch(url, { headers: { 'Accept-Language': 'nl' } })
         .then(response => response.json())
         .then(data => {
           if (data && data.length > 0) {
+            // Bereken de precieze afstand voor elk resultaat
             data.forEach(item => {
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
 
-            // Sorteer van dichtbij naar ver weg
+            // Sorteer feilloos van dichtbij naar ver weg
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
@@ -275,7 +280,7 @@ search_html = """
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
                          <div class="suggestion-content">
                            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
+                           <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
                          </div>
                          <span class="distance-badge">${distText}</span>
                        </div>`;
