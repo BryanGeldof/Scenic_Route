@@ -582,7 +582,7 @@ app_html = """
 <!-- Linkse zijbalk voor voorgestelde routes -->
 <div id="routesSidebar" class="routes-sidebar">
   <div class="routes-header">
-    <div class="routes-title">Voorgestelde Routes</div>
+    <div class="routes-title">Voorgestelde Rondritten</div>
     <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
   </div>
   <div id="routesListContainer">
@@ -946,7 +946,7 @@ app_html = """
     }
     
     if (isLoop) {
-      modalSubtitle.innerText = "Hoe lang mag de rondrit duren?";
+      modalSubtitle.innerText = "Gewenste lengte van de rondrit?";
       destInput.value = startInput.value;
       destLat = userLat;
       destLon = userLon;
@@ -995,7 +995,19 @@ app_html = """
     activeRouteLayers = [];
   }
 
-  // Genereer routes op basis van instellingen en checkboxes
+  async function fetchRouteWithFallback(urlWithoutExclude, urlWithExclude) {
+    try {
+      let response = await fetch(urlWithExclude);
+      if (!response.ok) throw new Error("Filter niet ondersteund");
+      let data = await response.json();
+      if (!data.routes || data.routes.length === 0) throw new Error("Geen routes");
+      return data;
+    } catch (e) {
+      let responseFallback = await fetch(urlWithoutExclude);
+      return await responseFallback.json();
+    }
+  }
+
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
@@ -1004,37 +1016,49 @@ app_html = """
     const avoidHighways = document.getElementById('chkHighways').checked;
     const targetValue = parseFloat(routeValueInput.value);
     
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Routes berekenen...</div>';
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Rondritten berekenen...</div>';
     routesSidebar.style.display = 'block';
 
     let routeOptions = [];
 
     if (isLoop) {
-      // Bereken richtingscoördinaten voor lussen op basis van gewenste afstand/tijd (gemiddeld 50km/u indien tijd)
-      let targetKm = currentPreference === 'time' ? targetValue * 45 : targetValue;
-      let radius = (targetKm / 4) / 111; // ruwe benadering in graden
+      // Als tijd is gekozen, reken om naar km (uitgaande van gemiddeld 50 km/u op toeristische wegen)
+      let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
+      
+      // Bereken de juiste straal voor een driehoekige lus zodat de totale omtrek dicht bij targetKm komt
+      // Omtrek driehoek is ca. 6.5 * radius van de cirkel
+      let radiusKm = targetKm / 6.5;
+      let radiusLat = radiusKm / 111;
+      let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-      let waypointsList = [
-        { name: "Noordelijke Rondrit", latOffset: radius, lonOffset: 0 },
-        { name: "Oostelijke Rondrit", latOffset: 0, lonOffset: radius },
-        { name: "Zuidelijke Rondrit", latOffset: -radius, lonOffset: 0 }
+      // 3 verschillende richtingsvarianten voor de driehoekige lussen
+      let loopVariations = [
+        { name: "Noord-Oost Rondrit", angleOffset: 0 },
+        { name: "Zuidoost Rondrit", angleOffset: (2 * Math.PI) / 3 },
+        { name: "Westelijke Rondrit", angleOffset: (4 * Math.PI) / 3 }
       ];
 
-      for (let i = 0; i < waypointsList.length; i++) {
-        let wp = waypointsList[i];
-        let midLat = userLat + wp.latOffset;
-        let midLon = userLon + wp.lonOffset;
+      for (let i = 0; i < loopVariations.length; i++) {
+        let v = loopVariations[i];
         
-        let url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${midLon},${midLat};${userLon},${userLat}?overview=full&geometries=geojson`;
-        if (avoidHighways) { url += "&exclude=motorway"; }
+        // Drie punten op een cirkel om een mooie driehoek-lus te vormen
+        let p1Lat = userLat + radiusLat * Math.sin(v.angleOffset);
+        let p1Lon = userLon + radiusLon * Math.cos(v.angleOffset);
+
+        let angle2 = v.angleOffset + ((2 * Math.PI) / 3);
+        let p2Lat = userLat + radiusLat * Math.sin(angle2);
+        let p2Lon = userLon + radiusLon * Math.cos(angle2);
+
+        // Volgorde: Start -> Punt 1 -> Punt 2 -> Start (Vormt een echte driehoekige lus)
+        let baseUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${p1Lon},${p1Lat};${p2Lon},${p2Lat};${userLon},${userLat}?overview=full&geometries=geojson`;
+        let excludeUrl = baseUrl + "&exclude=motorway";
 
         try {
-          let response = await fetch(url);
-          let data = await response.json();
+          let data = await fetchRouteWithFallback(baseUrl, avoidHighways ? excludeUrl : baseUrl);
           if (data.routes && data.routes.length > 0) {
             let r = data.routes[0];
             routeOptions.push({
-              name: wp.name,
+              name: v.name,
               distance: (r.distance / 1000).toFixed(1),
               duration: (r.duration / 3600).toFixed(1),
               geometry: r.geometry,
@@ -1044,15 +1068,13 @@ app_html = """
         } catch(e) { console.error(e); }
       }
     } else {
-      // Normale route van A naar B met alternatieven
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
-      let url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
-      if (avoidHighways) { url += "&exclude=motorway"; }
+      let baseUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
+      let excludeUrl = baseUrl + "&exclude=motorway";
 
       try {
-        let response = await fetch(url);
-        let data = await response.json();
+        let data = await fetchRouteWithFallback(baseUrl, avoidHighways ? excludeUrl : baseUrl);
         if (data.routes && data.routes.length > 0) {
           data.routes.forEach((r, index) => {
             routeOptions.push({
@@ -1072,13 +1094,12 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden met deze filters.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
       return;
     }
 
     let html = '';
     routes.forEach((route, index) => {
-      // Teken lijn op kaart
       let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
       let polyline = L.polyline(coords, { color: route.color, weight: index === 0 ? 6 : 4, opacity: 0.8 }).addTo(map);
       activeRouteLayers.push(polyline);
@@ -1101,7 +1122,6 @@ app_html = """
 
     routesListContainer.innerHTML = html;
 
-    // Zoom naar de eerste route
     if (activeRouteLayers.length > 0) {
       map.fitBounds(activeRouteLayers[0].getBounds(), { padding: [50, 50] });
     }
