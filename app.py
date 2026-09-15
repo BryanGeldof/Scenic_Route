@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ultra-premium Waze Glassmorphism Styling
+# Strakke Waze Glassmorphism Styling
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,55 +43,33 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Zwevend Waze Paneel linksboven (1/3 breedte, exact 24px marges) */
-    .waze-glass-panel {
-        position: fixed;
-        top: 24px;
-        left: 24px;
-        z-index: 99999;
+    /* Posysionering van de Streamlit container als één strak paneel linksboven */
+    .element-container {
+        position: fixed !important;
+        top: 24px !important;
+        left: 24px !important;
+        z-index: 99999 !important;
+        width: 360px !important;
+    }
+
+    /* Het glazen paneel om de widgets heen */
+    div[data-testid="stVerticalBlock"] > div:first-child {
         background: rgba(15, 23, 42, 0.88);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 24px;
         border-radius: 24px;
-        width: 380px;
         box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
-        color: #f8fafc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    .waze-glass-panel h2 {
-        font-size: 19px;
-        font-weight: 700;
-        margin: 0 0 4px 0;
-        background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .waze-glass-panel p {
-        font-size: 12px;
-        color: #94a3b8;
-        margin: 0 0 16px 0;
-    }
-
-    /* Streamlit widgets mooi integreren in het glazen paneel via vaste positionering */
-    .element-container {
-        position: fixed !important;
-        top: 130px !important;
-        left: 48px !important;
-        z-index: 100000 !important;
-        width: 332px !important;
-    }
-
-    /* Strakke invoervelden met vergrootglas */
+    /* Strakke invoervelden */
     .stTextInput input {
         background-color: rgba(30, 41, 59, 0.95) !important;
         color: #ffffff !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 14px !important;
-        padding: 12px 14px 12px 38px !important;
+        border-radius: 12px !important;
+        padding: 10px 14px 10px 36px !important;
         font-size: 14px !important;
     }
 
@@ -99,15 +77,15 @@ st.markdown("""
     .stButton>button {
         background: linear-gradient(135deg, #0ea5e9 0%, #2563eb) !important;
         color: white !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         border: none !important;
-        padding: 12px 20px !important;
+        padding: 10px 16px !important;
         font-weight: 600 !important;
         font-size: 14px !important;
         width: 100% !important;
         box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4) !important;
         cursor: pointer;
-        margin-top: 10px;
+        margin-top: 8px;
     }
 
     .stButton>button:hover {
@@ -122,7 +100,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Achtergrond Kaart (OpenStreetMap, geen API-key nodig)
+# 1. Achtergrond Kaart (OpenStreetMap)
 m = folium.Map(
     location=[50.8503, 4.3517], 
     zoom_start=11,
@@ -132,16 +110,11 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Het visuele glazen achtergrondpaneel linksboven
-st.markdown("""
-<div class="waze-glass-panel">
-    <h2>🗺️ Scenic Navigator</h2>
-    <p>Plan je route of schilderachtige lus</p>
-</div>
-""", unsafe_allow_html=True)
-
-# 3. De echte interactieve Streamlit elementen erbovenop gepositioneerd
+# 2. Één geïntegreerd paneel met titel, zoekveld, checkbox en knop
 with st.container():
+    st.markdown("### 🗺️ Scenic Navigator")
+    st.markdown("<p style='font-size: 12px; color: #94a3b8; margin-top: -10px; margin-bottom: 12px;'>Plan je route of schilderachtige lus</p>", unsafe_allow_html=True)
+    
     search_query = st.text_input("Bestemming", placeholder="🔍 Typ bestemming of adres...", label_visibility="collapsed")
     is_loop = st.checkbox("🔄 Maak schilderachtige lus vanaf locatie")
     
