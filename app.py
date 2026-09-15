@@ -3,87 +3,101 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 
-# Pagina configuratie
+# Pagina configuratie op full-width (wide)
 st.set_page_config(
-    page_title="Scenic Route Navigator",
-    page_icon="🗺️",
+    page_title="Waze Scenic Navigator",
+    page_icon="🚗",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Waze-like Dark Theme Styling
+# Waze-style Dark Theme & Floating Glassmorphism Styling
 st.markdown("""
 <style>
     .stApp {
         background-color: #0b0f19;
         color: #f8fafc;
     }
+    
+    /* Verberg standaard Streamlit branding voor een cleane app-look */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* Waze-style linker paneel (Zwevend element look) */
     [data-testid="stSidebar"] {
-        background-color: #111827;
+        background-color: rgba(17, 24, 39, 0.92);
+        backdrop-filter: blur(12px);
         border-right: 1px solid #1f2937;
+        padding-top: 10px;
     }
-    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+    
+    /* Strakke zoekbalk */
+    .stTextInput>div>div>input {
         background-color: #1f2937;
         color: white;
-        border-radius: 10px;
+        border-radius: 14px;
         border: 1px solid #374151;
+        padding: 12px 16px;
+        font-size: 15px;
     }
+    
+    /* Waze 'Rijden maar' knop (Neon blauw/cyaan gradient) */
     .stButton>button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+        background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
         color: white;
-        border-radius: 12px;
+        border-radius: 14px;
         border: none;
-        padding: 10px 20px;
-        font-weight: 600;
+        padding: 14px 20px;
+        font-weight: 700;
+        font-size: 16px;
         width: 100%;
-        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+        box-shadow: 0 4px 20px rgba(0, 210, 255, 0.4);
         transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
-        box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, #3ae8ff 0%, #2563eb 100%);
+        box-shadow: 0 6px 25px rgba(0, 210, 255, 0.6);
+        transform: translateY(-2px);
+    }
+    
+    /* Zorg dat de kaart maximaal gebruik maakt van de ruimte */
+    iframe {
+        border-radius: 16px;
+        border: 1px solid #1f2937;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Titel
-st.title("🗺️ Scenic Route Navigator")
-st.write("Plan je ideale schilderachtige route met een moderne navigatie-look.")
-
-# Sidebar voor invoer
+# Linkerbovenhoek / Sidebar als Waze Navigatie Paneel
 with st.sidebar:
-    st.header("Navigatie Opties")
-    start_loc = st.text_input("Startlocatie", "Gent")
-    end_loc = st.text_input("Bestemming", "Brugge")
-    tempo = st.slider("Tempo / Snelheid (km/u)", 10, 120, 50)
-    is_loop = st.checkbox("Ronde (Lus terug naar start)", value=False)
+    st.markdown("### 🚗 Waze Scenic Navigator")
+    st.write("Plan je route of genereer een ontspannende lus.")
     
-    calculate_btn = st.button("Bereken Route")
+    # Locatie zoekveld
+    search_query = st.text_input("🔍 Waarheen?", placeholder="Typ bestemming of adres...")
+    
+    # Checkbox voor lus op basis van huidige locatie
+    is_loop = st.checkbox("🔄 Maak een schilderachtige lus vanaf huidige locatie", value=False)
+    
+    # Navigatieknop
+    nav_button = st.button("Start Navigatie")
+    
+    if nav_button:
+        if is_loop:
+        # Code voor lus genereren
+            st.success("🔄 Lus-modus geactiveerd vanaf je huidige locatie!")
+        elif search_query:
+            st.success(f"🚀 Koers gezet naar: **{search_query}**")
+        else:
+            st.warning("⚠️ Voer een bestemming in of selecteer de lus-optie.")
 
-# Logica & Variabelen
-estimated_km = round(tempo * 0.8, 1)
+# Hoofdscherm: Volledige kaart in Waze Dark Mode stijl
+# We gebruiken CartoDB dark_matter voor die echte hippe navigatie-uitstraling
+m = folium.Map(
+    location=[51.0543, 3.7174], 
+    zoom_start=13,
+    tiles="CartoDB dark_matter"
+)
 
-# Weergave van info (gecorrigeerde f-string)
-st.info(f"Geschatte afstand bij dit tempo: **{estimated_km} km**")
-
-# Layout met kolommen
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.subheader("Route Kaart")
-    # Folium kaart renderen
-    m = folium.Map(location=[51.0543, 3.7174], zoom_start=11)
-    st_folium(m, width="100%", height=400)
-
-with col2:
-    st.subheader("Reisdetails")
-    route_type_text = 'Ronde (Lus)' if is_loop else 'Van A naar B'
-    st.markdown(f"""
-    <div style="background-color: #111827; padding: 20px; border-radius: 16px; border: 1px solid #1f2937;">
-        <p><b>Start:</b> {start_loc}</p>
-        <p><b>Bestemming:</b> {end_loc}</p>
-        <p><b>Type Route:</b> {route_type_text}</p>
-        <p><b>Gemiddeld Tempo:</b> {tempo} km/u</p>
-    </div>
-    """, unsafe_allow_html=True)
+# Render de kaart over vrijwel het hele scherm
+st_folium(m, use_container_width=True, height=780)
