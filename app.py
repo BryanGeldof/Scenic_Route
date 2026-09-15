@@ -66,7 +66,7 @@ with st.sidebar:
         speeds = {"Wandelen 🚶": 4.5, "Fietsen 🚴": 15.0, "Auto / Motor 🚗": 50.0}
         speed = speeds[transport_mode]
         estimated_km = round((target_time / 60) * speed, 1)
-        st.info( geschatte afstand bij dit tempo: **{estimated_km} km**)
+        st.info(f"Geschatte afstand bij dit tempo: **{estimated_km} km**")
 
     # 3. Loop or A-to-B
     route_type = st.radio("Route Type", ["Ronde (Start = Eindpunt)", "Van A naar B (Enkele reis)"])
