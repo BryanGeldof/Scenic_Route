@@ -999,19 +999,21 @@ app_html = """
     const avoidHighways = document.getElementById('chkHighways').checked;
     const targetValue = parseFloat(routeValueInput.value);
     
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Vloeiende rondritten berekenen...</div>';
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Natuurlijke rondritten berekenen...</div>';
     routesSidebar.style.display = 'block';
 
     let routeOptions = [];
-    let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
+    let serverBase = "https://routing.openstreetmap.de/routed-car/";
 
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.75;
+      // Bepaal de straal van de cirkel op basis van de gewenste afstand
+      let radiusKm = (targetKm / (2 * Math.PI)) * 0.8;
       let radiusLat = radiusKm / 111;
       let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
+      // We maken varianten (Noord, Oost, West) in een Trip-aanvraag
       let variations = [
         { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
         { name: "Rondrit Oosten", dirAngle: 0 },
@@ -1020,28 +1022,23 @@ app_html = """
 
       for (let i = 0; i < variations.length; i++) {
         let v = variations[i];
-        
         let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
         let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
-        let waypoints = [`${userLon},${userLat}`];
-        let radiuses = [`200`];
-
-        let numPoints = 4;
+        // Genereer punten in een lus, maar we gebruiken de Trip API i.p.v. Route API
+        // De Trip API verbindt punten vloeiend op basis van reizigersprobleem-optimalisatie
+        let coordsList = [`${userLon},${userLat}`];
+        let numPoints = 5;
         for (let j = 0; j < numPoints; j++) {
           let angle = j * (2 * Math.PI / numPoints);
           let pLat = centerLat + (radiusLat * Math.sin(angle));
           let pLon = centerLon + (radiusLon * Math.cos(angle));
-          waypoints.push(`${pLon},${pLat}`);
-          radiuses.push(`500`); // Grote tolerantie dwingt OSRM om doorgaande wegen te pakken i.p.v. woonerven
+          coordsList.push(`${pLon},${pLat}`);
         }
-        waypoints.push(`${userLon},${userLat}`);
-        radiuses.push(`200`);
 
-        let waypointsStr = waypoints.join(';');
-        let radiusesStr = radiuses.join(';');
-
-        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}`;
+        let coordsStr = coordsList.join(';');
+        // Gebruik /trip/v1/driving/ ipv /route/v1/driving/
+        let url = `${serverBase}trip/v1/driving/${coordsStr}?roundtrip=true&source=first&destination=first&overview=full&geometries=geojson`;
         if (avoidHighways) {
           url += "&exclude=motorway";
         }
@@ -1049,13 +1046,13 @@ app_html = """
         try {
           let response = await fetch(url);
           let data = await response.json();
-          if (data.routes && data.routes.length > 0) {
-            let r = data.routes[0];
+          if (data.code === "Ok" && data.trips && data.trips.length > 0) {
+            let t = data.trips[0];
             routeOptions.push({
               name: v.name,
-              distance: (r.distance / 1000).toFixed(1),
-              duration: (r.duration / 3600).toFixed(1),
-              geometry: r.geometry,
+              distance: (t.distance / 1000).toFixed(1),
+              duration: (t.duration / 3600).toFixed(1),
+              geometry: t.geometry,
               color: i === 0 ? '#3b82f6' : (i === 1 ? '#10b981' : '#f59e0b')
             });
           }
@@ -1064,7 +1061,7 @@ app_html = """
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
-      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
+      let url = `${serverBase}route/v1/driving/${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
       if (avoidHighways) {
         url += "&exclude=motorway";
       }
@@ -1091,7 +1088,7 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen lussen gevonden. Probeer een andere afstand.</div>';
       return;
     }
 
