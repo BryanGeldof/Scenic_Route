@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met slimme Location Bias (exact zoals Google Maps)
+# 2. Zoekbalk streng beperkt tot België (countrycodes=be) + Afstandssortering
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -199,7 +199,7 @@ search_html = """
 
 <div class="search-wrapper">
   <div class="search-container">
-    <input type="text" id="searchInput" class="search-input" placeholder="Zoek straat of plaats..." autocomplete="off">
+    <input type="text" id="searchInput" class="search-input" placeholder="Zoek straat of plaats in België..." autocomplete="off">
     <button class="search-btn" onclick="triggerSearch()">
       <svg viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"></circle>
@@ -219,7 +219,7 @@ search_html = """
   let userLat = 50.8280;
   let userLon = 3.2648;
 
-  // Haal op de achtergrond de exacte IP-locatie op
+  // IP-locatie op de achtergrond ophalen ter verfijning
   fetch('https://ipwho.is/')
     .then(response => response.json())
     .then(data => {
@@ -229,7 +229,7 @@ search_html = """
       }
     })
     .catch(err => {
-      console.log("Kon IP-locatie niet laden, fallback wordt gebruikt.");
+      console.log("IP-locatie kon niet worden geladen.");
     });
 
   function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -254,22 +254,19 @@ search_html = """
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      // GEOLOCATIE BIAS: Maak een denkbeeldig kader van ~100km rond de gebruiker 
-      // zodat de API direct lokale straten prioriteit geeft (net als Google Maps)
+      // BELANGRIJK: countrycodes=be toegevoegd zodat resultaten ALTIJD in België blijven
       const viewbox = `${userLon - 0.8},${userLat + 0.8},${userLon + 0.8},${userLat - 0.8}`;
-      
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10&viewbox=${viewbox}&bounded=0`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10&countrycodes=be&viewbox=${viewbox}&bounded=0`;
       
       fetch(url, { headers: { 'Accept-Language': 'nl' } })
         .then(response => response.json())
         .then(data => {
           if (data && data.length > 0) {
-            // Bereken de precieze afstand voor elk resultaat
             data.forEach(item => {
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
 
-            // Sorteer feilloos van dichtbij naar ver weg
+            // Sorteer feilloos van dichtbij naar ver weg binnen België
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
