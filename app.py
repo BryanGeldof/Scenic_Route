@@ -1008,34 +1008,44 @@ app_html = """
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      // Bereken de radius op basis van de cirkelomtrek (Omtrek = 2 * pi * R)
-      // We passen een correctiefactor toe (0.75) omdat wegen door de bochten en infrastructuur langer zijn dan rechte lijnen.
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.75;
+      // Straalberekening op basis van omtrek
+      let radiusKm = (targetKm / (2 * Math.PI)) * 0.7;
       let radiusLat = radiusKm / 111;
       let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-      // We maken 3 verschillende varianten met vloeiende waypoints verdeeld in een cirkel (stappen van 60° of 45°)
+      // Verschillende richtingen (Noord, Oost, West) zodat het startpunt op de *rand* van de cirkel ligt
       let variations = [
-        { name: "Rondrit Noord-Oost", startAngleOffset: 0 },
-        { name: "Rondrit Zuid-West", startAngleOffset: Math.PI }
+        { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
+        { name: "Rondrit Oosten", dirAngle: 0 },
+        { name: "Rondrit Westen", dirAngle: Math.PI }
       ];
 
       for (let i = 0; i < variations.length; i++) {
         let v = variations[i];
-        let waypointsStr = `${userLon},${userLat}`;
         
-        // Genereer 6 waypoints in een cirkel (elke 60 graden, om een mooie gladde lus te krijgen die hoofdwegen verkiest)
-        let numPoints = 6;
-        for (let j = 0; j < numPoints; j++) {
-          let angle = v.startAngleOffset + (j * (2 * Math.PI / numPoints));
-          let pLat = userLat + (radiusLat * Math.sin(angle));
-          let pLon = userLon + (radiusLon * Math.cos(angle));
-          waypointsStr += `;${pLon},${pLat}`;
-        }
-        // Sluit de lus terug naar start
-        waypointsStr += `;${userLon},${userLat}`;
+        // Verschuif het middelpunt zodat het startpunt op de rand van de cirkel ligt
+        let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
+        let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
-        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson`;
+        let waypoints = [`${userLon},${userLat}`];
+        let radiuses = [`50`]; // Starttolerantie
+
+        // 4 waypoints verdeeld per 90 graden rondom het nieuwe middelpunt
+        let numPoints = 4;
+        for (let j = 0; j < numPoints; j++) {
+          let angle = j * (2 * Math.PI / numPoints);
+          let pLat = centerLat + (radiusLat * Math.sin(angle));
+          let pLon = centerLon + (radiusLon * Math.cos(angle));
+          waypoints.push(`${pLon},${pLat}`);
+          radiuses.push(`150`); // 150m tolerantie zodat OSRM doorgaande wegen verkiest boven doodlopende steegjes
+        }
+        waypoints.push(`${userLon},${userLat}`);
+        radiuses.push(`50`);
+
+        let waypointsStr = waypoints.join(';');
+        let radiusesStr = radiuses.join(';');
+
+        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}`;
         if (avoidHighways) {
           url += "&exclude=motorway";
         }
@@ -1050,7 +1060,7 @@ app_html = """
               distance: (r.distance / 1000).toFixed(1),
               duration: (r.duration / 3600).toFixed(1),
               geometry: r.geometry,
-              color: i === 0 ? '#3b82f6' : '#10b981'
+              color: i === 0 ? '#3b82f6' : (i === 1 ? '#10b981' : '#f59e0b')
             });
           }
         } catch(e) { console.error(e); }
