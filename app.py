@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met live autocomplete voor alle letters en straatnamen
+# 2. Zoekbalk met echte live API-autocomplete voor álle straten en locaties
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -141,7 +141,7 @@ search_html = """
     overflow-y: auto;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
-    max-height: 260px;
+    max-height: 280px;
   }
 
   .suggestion-item {
@@ -154,6 +154,7 @@ search_html = """
     align-items: center;
     gap: 12px;
     transition: background 0.15s ease;
+    text-align: left;
   }
 
   .suggestion-item:last-child {
@@ -180,7 +181,7 @@ search_html = """
 
 <div class="search-wrapper">
   <div class="search-container">
-    <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming of straat..." autocomplete="off">
+    <input type="text" id="searchInput" class="search-input" placeholder="Zoek straat of plaats..." autocomplete="off">
     <button class="search-btn" onclick="triggerSearch()">
       <svg viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"></circle>
@@ -192,58 +193,47 @@ search_html = """
 </div>
 
 <script>
-  // Uitgebreide lijst inclusief straten zoals Ommegangstraat, Aalbeke
-  const mockLocations = [
-    "Ommegangstraat, Aalbeke",
-    "Ommegangstraat, Kortrijk",
-    "Ommeganglaan, Mechelen",
-    "Brussel, Centrum",
-    "Brussel-Zuid Station",
-    "Antwerpen Centraal Station",
-    "Antwerpen, Grote Markt",
-    "Gent, Korenmarkt",
-    "Gent-Sint-Pieters",
-    "Brugge, Grote Markt",
-    "Leuven, Oude Markt",
-    "Leuven Station",
-    "Oostende, Zeedijk",
-    "Mechelen, Sint-Romboutstoren",
-    "Hasselt, Demerstraat",
-    "Kortrijk, Broeltorens",
-    "Teststraat 1, 1111 Brussel",
-    "Waterloo, Leeuw van Waterloo",
-    "Blankenberge, Pier",
-    "Knokke-Heist, Kustlaan"
-  ];
-
   const input = document.getElementById('searchInput');
   const suggestionsBox = document.getElementById('suggestions');
+  let timeoutId = null;
 
-  // Direct filteren bij elke getypte letter (input event)
+  // Live zoekopdrachten via de OpenStreetMap Nominatim API bij elke letter
   input.addEventListener('input', function() {
-    const query = input.value.trim().toLowerCase();
+    const query = input.value.trim();
     
-    if (query.length === 0) {
+    if (query.length < 2) {
       suggestionsBox.style.display = 'none';
       return;
     }
 
-    // Filter doorlopend op elk teken dat je intoetst
-    const filtered = mockLocations.filter(loc => loc.toLowerCase().includes(query));
-    
-    if (filtered.length > 0) {
-      let html = '';
-      filtered.forEach(loc => {
-        html += `<div class="suggestion-item" onclick="selectSuggestion('${loc}')">
-                   <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                   ${loc}
-                 </div>`;
-      });
-      suggestionsBox.innerHTML = html;
-      suggestionsBox.style.display = 'block';
-    } else {
-      suggestionsBox.style.display = 'none';
-    }
+    // Voorkom teveel API-aanvragen per milliseconde (debounce)
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      // Vraag live suggesties op in het Nederlands
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
+      
+      fetch(url, { headers: { 'Accept-Language': 'nl' } })
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            let html = '';
+            data.forEach(item => {
+              const name = item.display_name.replace(/'/g, "\\'");
+              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
+                         <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                         ${item.display_name}
+                       </div>`;
+            });
+            suggestionsBox.innerHTML = html;
+            suggestionsBox.style.display = 'block';
+          } else {
+            suggestionsBox.style.display = 'none';
+          }
+        })
+        .catch(err => {
+          console.error("Fout bij ophalen suggesties:", err);
+        });
+    }, 250);
   });
 
   // Klik buiten de zoekbalk sluit de suggesties
@@ -270,7 +260,7 @@ search_html = """
   function triggerSearch() {
     const val = input.value;
     if (val.trim() !== '') {
-      console.log("Zoeken naar:", val);
+      console.log("Navigeren naar:", val);
     }
   }
 </script>
