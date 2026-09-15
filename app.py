@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met echte browser-geolocatie voor het beginpunt
+# 2. Zoekbalk met dynamische dropdown per invulveld
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -151,20 +151,19 @@ search_html = """
     stroke-linejoin: round;
   }
 
-  /* Suggesties Dropdown */
+  /* Universele Suggesties Dropdown */
   .suggestions-dropdown {
     display: none;
     position: absolute;
-    top: 64px;
-    left: 14px;
-    width: 370px;
     background: #ffffff;
     border-radius: 16px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
     overflow-y: auto;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
-    max-height: 280px;
+    max-height: 250px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .suggestion-item {
@@ -232,7 +231,7 @@ search_html = """
 
   .option-group {
     margin-bottom: 14px;
-    position: relative;
+    position: relative; /* Cruciaal om de dropdown hierin te verankeren */
   }
 
   .option-group label {
@@ -293,7 +292,8 @@ search_html = """
 <body>
 
 <div class="search-wrapper">
-  <div class="search-container">
+  <!-- Hoofdzoekbalk container -->
+  <div class="search-container" id="mainSearchContainer" style="position: relative;">
     <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming..." autocomplete="off">
     <button class="expand-btn" id="expandBtn" title="Opties weergeven">
       <svg id="arrowIcon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -305,17 +305,15 @@ search_html = """
       </svg>
     </button>
   </div>
-  
-  <div id="suggestions" class="suggestions-dropdown"></div>
 
   <!-- Uitklapbaar venster -->
   <div id="optionsPanel" class="options-panel">
-    <div class="option-group">
+    <div class="option-group" id="startGroup">
       <label>Beginpunt</label>
       <input type="text" id="startInput" class="option-input" value="Locatie ophalen..." autocomplete="off">
     </div>
     
-    <div class="option-group">
+    <div class="option-group" id="destGroup">
       <label>Bestemming</label>
       <input type="text" id="destInput" class="option-input" placeholder="Bestemming..." autocomplete="off">
     </div>
@@ -337,6 +335,9 @@ search_html = """
   </div>
 </div>
 
+<!-- Universeel suggestievenster dat dynamisch verhuist -->
+<div id="suggestions" class="suggestions-dropdown"></div>
+
 <script>
   const input = document.getElementById('searchInput');
   const destInput = document.getElementById('destInput');
@@ -346,19 +347,22 @@ search_html = """
   const optionsPanel = document.getElementById('optionsPanel');
   const arrowIcon = document.getElementById('arrowIcon');
   
+  const mainSearchContainer = document.getElementById('mainSearchContainer');
+  const startGroup = document.getElementById('startGroup');
+  const destGroup = document.getElementById('destGroup');
+
   let timeoutId = null;
   let userLat = 50.8280;
   let userLon = 3.2648;
   let activeTargetInput = null;
 
-  // VRAAG TOESTEMMING AAN APPARAAT VOOR GPS-LOCATIE
+  // Browser geolocatie ophalen
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         userLat = position.coords.latitude;
         userLon = position.coords.longitude;
         
-        // Vraag bijhorende adres op via Reverse Geocoding van OpenStreetMap
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1`, {
           headers: { 'Accept-Language': 'nl' }
         })
@@ -375,7 +379,6 @@ search_html = """
         });
       },
       (error) => {
-        console.log("Geolocatie geweigerd of mislukt, val terug op IP-locatie.");
         fallbackIpLocation();
       },
       { timeout: 10000, enableHighAccuracy: true }
@@ -384,7 +387,6 @@ search_html = """
     fallbackIpLocation();
   }
 
-  // Fallback op IP-locatie als browser GPS weigert
   function fallbackIpLocation() {
     fetch('https://ipwho.is/')
       .then(response => response.json())
@@ -406,17 +408,43 @@ search_html = """
     if (isOpen) {
       optionsPanel.style.display = 'none';
       arrowIcon.style.transform = 'rotate(0deg)';
+      suggestionsBox.style.display = 'none';
     } else {
       optionsPanel.style.display = 'block';
       arrowIcon.style.transform = 'rotate(180deg)';
     }
   });
 
-  // Functie om OpenStreetMap data op te halen voor een gegeven veld
+  // Functie om de lijst dynamisch te verplaatsen naar het actieve invoerveld
+  function positionDropdown(targetField) {
+    let parentWrapper = null;
+    if (targetField === input) {
+      parentWrapper = mainSearchContainer;
+      suggestionsBox.style.top = '62px';
+      suggestionsBox.style.left = '0px';
+      suggestionsBox.style.width = '100%';
+    } else if (targetField === startInput) {
+      parentWrapper = startGroup;
+      suggestionsBox.style.top = '64px';
+      suggestionsBox.style.left = '0px';
+      suggestionsBox.style.width = '100%';
+    } else if (targetField === destInput) {
+      parentWrapper = destGroup;
+      suggestionsBox.style.top = '64px';
+      suggestionsBox.style.left = '0px';
+      suggestionsBox.style.width = '100%';
+    }
+
+    if (parentWrapper && suggestionsBox.parentNode !== parentWrapper) {
+      parentWrapper.appendChild(suggestionsBox);
+    }
+  }
+
   function handleInputTyping(queryField) {
     const query = queryField.value.trim();
     activeTargetInput = queryField;
 
+    // Synchroniseer hoofdzoekbalk en bestemmingsveld indien gewenst
     if (queryField === input) {
       destInput.value = input.value;
     } else if (queryField === destInput) {
@@ -427,6 +455,8 @@ search_html = """
       suggestionsBox.style.display = 'none';
       return;
     }
+
+    positionDropdown(queryField);
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
