@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met Maps/Waze-stijl suggesties popup
+# 2. Zoekbalk met doorlopende live autocomplete voor elke letter
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -128,7 +128,7 @@ search_html = """
     stroke-linejoin: round;
   }
 
-  /* Suggesties Dropdown in Maps/Waze stijl */
+  /* Suggesties Dropdown */
   .suggestions-dropdown {
     display: none;
     position: absolute;
@@ -141,6 +141,8 @@ search_html = """
     overflow: hidden;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
+    max-height: 250px;
+    overflow-y: auto;
   }
 
   .suggestion-item {
@@ -191,32 +193,40 @@ search_html = """
 </div>
 
 <script>
-  // Voorbeeld database van locaties (je kunt dit later uitbreiden of aan koppelen)
+  // Uitgebreide lijst met locaties voor vloeiende autocomplete bij elke letter
   const mockLocations = [
     "Brussel, Centrum",
+    "Brussel-Zuid Station",
     "Antwerpen Centraal Station",
+    "Antwerpen, Grote Markt",
     "Gent, Korenmarkt",
+    "Gent-Sint-Pieters",
     "Brugge, Grote Markt",
     "Leuven, Oude Markt",
+    "Leuven Station",
     "Oostende, Zeedijk",
     "Mechelen, Sint-Romboutstoren",
     "Hasselt, Demerstraat",
     "Kortrijk, Broeltorens",
     "Teststraat 1, 1111 Brussel",
-    "Waterloo, Leeuw van Waterloo"
+    "Waterloo, Leeuw van Waterloo",
+    "Blankenberge, Pier",
+    "Knokke-Heist, Kustlaan"
   ];
 
   const input = document.getElementById('searchInput');
   const suggestionsBox = document.getElementById('suggestions');
 
-  // Luister naar typgedrag voor live suggesties
+  // Trigger live filtering op elk type-event (input) voor alle letters
   input.addEventListener('input', function() {
     const query = input.value.trim().toLowerCase();
+    
     if (query.length === 0) {
       suggestionsBox.style.display = 'none';
       return;
     }
 
+    // Filter locaties waarbij elk getypte teken ergens in de naam voorkomt
     const filtered = mockLocations.filter(loc => loc.toLowerCase().includes(query));
     
     if (filtered.length > 0) {
@@ -234,7 +244,7 @@ search_html = """
     }
   });
 
-  // Klik buiten de zoekbalk sluit de suggesties
+  // Klik buiten de zoekbalk verbergt de suggesties
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrapper')) {
       suggestionsBox.style.display = 'none';
@@ -258,7 +268,6 @@ search_html = """
   function triggerSearch() {
     const val = input.value;
     if (val.trim() !== '') {
-      // Actie triggeren
       console.log("Zoeken naar:", val);
     }
   }
@@ -268,5 +277,5 @@ search_html = """
 </html>
 """
 
-# Render de component pixel-perfect op het scherm met wat extra ruimte voor de dropdown
+# Render de component
 components.html(search_html, height=120, scrolling=False)
