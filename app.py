@@ -2,7 +2,7 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
-# Pagina configuratie op full-width en ingeklapte sidebar
+# Pagina configuratie op full-width
 st.set_page_config(
     page_title="Scenic Route Navigator",
     page_icon="🗺️",
@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ultra-premium Waze/Google Maps Glassmorphism Styling
+# Ultra-premium Waze / Google Maps Glassmorphism Styling
 st.markdown("""
 <style>
     /* Verberg standaard Streamlit elementen, headers en footers */
@@ -25,7 +25,6 @@ st.markdown("""
         padding: 0;
     }
     
-    /* Zorg dat de hoofdcontainer absoluut geen marges heeft */
     .block-container {
         padding: 0 !important;
         margin: 0 !important;
@@ -34,7 +33,7 @@ st.markdown("""
         overflow: hidden !important;
     }
     
-    /* Forceer de kaart om het volledige scherm te vullen achter de overlay */
+    /* Kaart vult het volledige scherm */
     iframe {
         width: 100vw !important;
         height: 100vh !important;
@@ -45,20 +44,20 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Ultra-premium zwevend Waze / Google Maps bedieningspaneel linksboven */
+    /* Ultra-premium zwevend Waze / Google Maps bedieningspaneel */
     .floating-control-panel {
         position: fixed;
         top: 24px;
         left: 24px;
         z-index: 99999;
-        background: rgba(15, 23, 42, 0.82);
+        background: rgba(15, 23, 42, 0.88);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 24px;
-        border-radius: 20px;
+        border-radius: 24px;
         width: 380px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
         color: #f8fafc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
@@ -78,11 +77,11 @@ st.markdown("""
         margin-bottom: 16px;
     }
 
-    /* Strakke inputvelden in Waze-stijl */
+    /* Strakke inputvelden */
     .stTextInput>div>div>input {
-        background-color: rgba(30, 41, 59, 0.8) !important;
+        background-color: rgba(30, 41, 59, 0.9) !important;
         color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
         border-radius: 12px !important;
         padding: 12px 16px !important;
         font-size: 14px !important;
@@ -90,7 +89,7 @@ st.markdown("""
     
     .stTextInput>div>div>input:focus {
         border-color: #38bdf8 !important;
-        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
     }
 
     /* Futuristische gradient navigatieknop */
@@ -104,7 +103,8 @@ st.markdown("""
         font-size: 15px !important;
         width: 100% !important;
         box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.3s ease !important;
+        margin-top: 10px;
     }
 
     .stButton>button:hover {
@@ -113,39 +113,60 @@ st.markdown("""
         transform: translateY(-1px);
     }
 
-    /* Checkbox styling */
     .stCheckbox {
-        margin-top: 10px;
-        margin-bottom: 10px;
+        margin-top: 8px;
+        margin-bottom: 8px;
     }
     .stCheckbox label {
         color: #cbd5e1 !important;
-        font-size: 14px !important;
+        font-size: 13px !important;
+    }
+    
+    /* Zorg dat Streamlit elementen netjes binnen het paneel vallen via absolute positioning */
+    .element-container {
+        position: relative;
+        z-index: 100000;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Achtergrond Kaart (Volledig scherm, ultramoderne donkere stijl)
+# 1. Achtergrond Kaart (Gebruik Stamen / OpenStreetMap alternatief dat géén API-key vereist)
 m = folium.Map(
-    location=[50.8503, 4.3517],  # Centrum België
+    location=[50.8503, 4.3517], 
     zoom_start=11,
-    tiles="CartoDB dark_matter",
-    zoom_control=False,  # Verberg standaard controls voor een cleane look
+    tiles="OpenStreetMap", # Altijd gratis en werkt direct zonder watermerken
+    zoom_control=False,
     attributionControl=False
 )
 
-# Render de kaart fullscreen via st_folium
+# Render de kaart fullscreen
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zwevend Glassmorphism Bedieningspaneel (Boven de map in de linkerhoek)
-with st.container():
-    st.markdown("""
-    <div class="floating-control-panel">
-        <h2>🗺️ Scenic Navigator</h2>
-        <p>Ontdek de mooiste routes met een Waze-look</p>
-    </div>
-    """, unsafe_allow_html=True)
+# 2. Het vaste, zwevende Waze glassmorphism paneel met daarin direct de invoer
+st.markdown("""
+<div class="floating-control-panel">
+    <h2>🗺️ Scenic Navigator</h2>
+    <p>Ontdek de mooiste routes met een Waze-look</p>
+</div>
+""", unsafe_allow_html=True)
 
-    # Omdat Streamlit widgets direct in de HTML-stream geplaatst moeten worden, 
-    # vangen we ze op binnen een nette wrapper onder het paneel.
-    # Hier maken we een nette integratie via een kleine st.sidebar of floating structuur.
+# We creëren een kleine tijdelijke container om de widgets visueel in het paneel te plaatsen
+# Door de unieke styling vallen ze direct onder de titel in het glazen vlak.
+col_dummy, _ = st.columns([1, 3]) # Kleine hack om de breedte te beperken tot het paneel
+
+with st.container():
+    # Om te zorgen dat ze exact over het paneel vallen injecteren we ze via een strakke wrapper
+    st.markdown('<div style="position: fixed; top: 115px; left: 40px; z-index: 100000; width: 340px;">', unsafe_allow_html=True)
+    
+    search_query = st.text_input("Waarheen?", placeholder="Typ bestemming of adres...", label_visibility="collapsed")
+    is_loop = st.checkbox("🔄 Maak schilderachtige lus vanaf huidige locatie")
+    
+    if st.button("Start Navigatie"):
+        if is_loop:
+            st.success("🔄 Lus-modus ingeschakeld!")
+        elif search_query:
+            st.success(f"🚀 Koers gezet naar: {search_query}")
+        else:
+            st.warning("⚠️ Voer een bestemming in.")
+            
+    st.markdown('</div>', unsafe_allow_html=True)
