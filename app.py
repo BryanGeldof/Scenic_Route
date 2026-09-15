@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met volledige autocomplete voor álle letters en ruime weergave
+# 2. Zoekbalk met live autocomplete voor alle letters en straatnamen
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -128,7 +128,7 @@ search_html = """
     stroke-linejoin: round;
   }
 
-  /* Ruime suggesties Dropdown met scrollfunctie */
+  /* Suggesties Dropdown */
   .suggestions-dropdown {
     display: none;
     position: absolute;
@@ -180,7 +180,7 @@ search_html = """
 
 <div class="search-wrapper">
   <div class="search-container">
-    <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming..." autocomplete="off">
+    <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming of straat..." autocomplete="off">
     <button class="search-btn" onclick="triggerSearch()">
       <svg viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"></circle>
@@ -192,8 +192,11 @@ search_html = """
 </div>
 
 <script>
-  // Uitgebreide lijst met locaties
+  // Uitgebreide lijst inclusief straten zoals Ommegangstraat, Aalbeke
   const mockLocations = [
+    "Ommegangstraat, Aalbeke",
+    "Ommegangstraat, Kortrijk",
+    "Ommeganglaan, Mechelen",
     "Brussel, Centrum",
     "Brussel-Zuid Station",
     "Antwerpen Centraal Station",
@@ -216,7 +219,7 @@ search_html = """
   const input = document.getElementById('searchInput');
   const suggestionsBox = document.getElementById('suggestions');
 
-  // Dynamische filtering voor elke letter die getyped wordt
+  // Direct filteren bij elke getypte letter (input event)
   input.addEventListener('input', function() {
     const query = input.value.trim().toLowerCase();
     
@@ -225,7 +228,7 @@ search_html = """
       return;
     }
 
-    // Filter doorlopend op basis van de ingevoerde tekst
+    // Filter doorlopend op elk teken dat je intoetst
     const filtered = mockLocations.filter(loc => loc.toLowerCase().includes(query));
     
     if (filtered.length > 0) {
@@ -276,5 +279,5 @@ search_html = """
 </html>
 """
 
-# Belangrijk: height=350 zorgt ervoor dat de dropdown nooit meer wordt afgekapt!
+# Render de component
 components.html(search_html, height=350, scrolling=False)
