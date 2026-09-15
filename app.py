@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk, uitklapmenu én de centrale route-popup met waardeselector
+# 2. Zoekbalk, uitklapmenu met locatie-iconen én centrale route-popup
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -80,6 +80,26 @@ search_html = """
     height: 56px;
     border-radius: 50px;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    padding-left: 18px;
+  }
+
+  /* Locatie icoon in hoofdzoekbalk (Wit op donker rondje of passend) */
+  .search-icon-badge {
+    width: 32px;
+    height: 32px;
+    background-color: #1e293b;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .search-icon-badge svg {
+    width: 16px;
+    height: 16px;
+    fill: #ffffff;
   }
 
   .search-input {
@@ -87,7 +107,6 @@ search_html = """
     border: none;
     outline: none;
     background: transparent;
-    padding-left: 24px;
     padding-right: 12px;
     font-size: 16px;
     color: #1e293b;
@@ -198,11 +217,7 @@ search_html = """
   .suggestion-item svg {
     width: 16px;
     height: 16px;
-    stroke: #64748b;
-    fill: none;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: #64748b;
     flex-shrink: 0;
   }
 
@@ -244,22 +259,58 @@ search_html = """
     letter-spacing: 0.5px;
   }
 
+  .input-with-icon {
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0 12px;
+    height: 44px;
+  }
+
+  .input-with-icon:focus-within {
+    border-color: #3b82f6;
+    background: #ffffff;
+  }
+
+  /* Zwart pijltje voor vertrek / Wit pijltje voor bestemming */
+  .field-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .field-icon.black {
+    background-color: #1e293b;
+  }
+  .field-icon.black svg {
+    fill: #ffffff;
+    width: 12px;
+    height: 12px;
+  }
+
+  .field-icon.white {
+    background-color: #e2e8f0;
+  }
+  .field-icon.white svg {
+    fill: #1e293b;
+    width: 12px;
+    height: 12px;
+  }
+
   .option-input {
     width: 100%;
-    height: 40px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 0 14px;
+    border: none;
+    background: transparent;
     font-size: 14px;
     color: #1e293b;
     outline: none;
-    box-sizing: border-box;
-    background: #f8fafc;
-  }
-
-  .option-input:focus {
-    border-color: #3b82f6;
-    background: #ffffff;
   }
 
   .checkbox-group {
@@ -383,7 +434,6 @@ search_html = """
     stroke: #1e293b;
   }
 
-  /* Invoer sectie voor aantal uur / km met up/down pijltjes */
   .value-input-group {
     margin-bottom: 20px;
     background: #f8fafc;
@@ -462,9 +512,13 @@ search_html = """
 <body>
 
 <div class="search-wrapper">
-  <!-- Hoofdzoekbalk container -->
+  <!-- Hoofdzoekbalk container met wit locatie-icoon -->
   <div class="search-container" id="mainSearchContainer" style="position: relative;">
-    <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming..." autocomplete="off">
+    <div class="search-icon-badge">
+      <!-- Wit locatiepijltje -->
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+    </div>
+    <input type="text" id="searchInput" class="search-input" placeholder="Waar wil je naartoe?" autocomplete="off">
     <button class="expand-btn" id="expandBtn" title="Opties weergeven">
       <svg id="arrowIcon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </button>
@@ -478,19 +532,31 @@ search_html = """
 
   <!-- Uitklapbaar venster -->
   <div id="optionsPanel" class="options-panel">
+    <!-- Startpunt met ZWART locatiepijltje -->
     <div class="option-group" id="startGroup">
-      <label>Beginpunt</label>
-      <input type="text" id="startInput" class="option-input" value="Locatie ophalen..." autocomplete="off">
+      <label>Vertrekpunt</label>
+      <div class="input-with-icon">
+        <div class="field-icon black">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </div>
+        <input type="text" id="startInput" class="option-input" value="Locatie ophalen..." autocomplete="off">
+      </div>
     </div>
     
+    <!-- Bestemming met WIT locatiepijltje -->
     <div class="option-group" id="destGroup">
       <label>Bestemming</label>
-      <input type="text" id="destInput" class="option-input" placeholder="Bestemming..." autocomplete="off">
+      <div class="input-with-icon">
+        <div class="field-icon white">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </div>
+        <input type="text" id="destInput" class="option-input" placeholder="Bestemming..." autocomplete="off">
+      </div>
     </div>
 
     <div class="checkbox-group">
       <label class="checkbox-label">
-        <input type="checkbox" id="chkLoop"> Maak een lus (rondrit)
+        <input type="checkbox" id="chkLoop" onchange="toggleLoopMode()"> Maak een lus (rondrit)
       </label>
       <label class="checkbox-label">
         <input type="checkbox" id="chkHighways" checked> Autostrades vermijden
@@ -515,7 +581,7 @@ search_html = """
       Route optimalisatie
       <button class="close-modal" onclick="closeRouteModal()">&times;</button>
     </div>
-    <div class="modal-subtitle">Hoe wil je dat de route berekend wordt?</div>
+    <div class="modal-subtitle" id="modalSubtitle">Hoe wil je dat de route berekend wordt?</div>
 
     <div class="preference-container">
       <label class="pref-option selected" id="optTime" onclick="setPreference('time')">
@@ -531,7 +597,7 @@ search_html = """
       </label>
     </div>
 
-    <!-- Dynamische waarde selector (Aantal uur / kilometer met up/down pijltjes) -->
+    <!-- Dynamische waarde selector -->
     <div class="value-input-group">
       <label id="valueLabel">Gewenste duur</label>
       <div class="number-input-wrapper">
@@ -557,10 +623,12 @@ search_html = """
   const startGroup = document.getElementById('startGroup');
   const destGroup = document.getElementById('destGroup');
   const routeModal = document.getElementById('routeModal');
+  const modalSubtitle = document.getElementById('modalSubtitle');
   
   const routeValueInput = document.getElementById('routeValueInput');
   const valueLabel = document.getElementById('valueLabel');
   const unitLabel = document.getElementById('unitLabel');
+  const chkLoop = document.getElementById('chkLoop');
 
   let timeoutId = null;
   let userLat = 50.8280;
@@ -626,6 +694,16 @@ search_html = """
     }
   });
 
+  // Schakelt de weergave van het bestemmingsveld uit als een lus gekozen wordt
+  function toggleLoopMode() {
+    if (chkLoop.checked) {
+      destGroup.style.display = 'none';
+      destInput.value = '';
+    } else {
+      destGroup.style.display = 'block';
+    }
+  }
+
   function positionDropdown(targetField) {
     let parentWrapper = null;
     if (targetField === input) {
@@ -654,7 +732,7 @@ search_html = """
     const query = queryField.value.trim();
     activeTargetInput = queryField;
 
-    if (queryField === input) {
+    if (queryField === input && !chkLoop.checked) {
       destInput.value = input.value;
     } else if (queryField === destInput) {
       input.value = destInput.value;
@@ -687,9 +765,10 @@ search_html = """
               const name = item.display_name.replace(/'/g, "\\'");
               let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
               
+              // Witte locatiepijltje in de suggestielijst per item
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
                          <div class="suggestion-content">
-                           <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                           <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
                          </div>
                          <span class="distance-badge">${distText}</span>
@@ -753,7 +832,7 @@ search_html = """
   function selectSuggestion(val) {
     if (activeTargetInput) {
       activeTargetInput.value = val;
-      if (activeTargetInput === input || activeTargetInput === destInput) {
+      if (activeTargetInput === input && !chkLoop.checked) {
         input.value = val;
         destInput.value = val;
       }
@@ -762,11 +841,21 @@ search_html = """
   }
 
   function openRouteModal() {
+    const isLoop = chkLoop.checked;
     const dest = destInput.value.trim();
-    if (dest === '') {
+    const mainVal = input.value.trim();
+
+    if (!isLoop && dest === '' && mainVal === '') {
       input.focus();
       return;
     }
+    
+    if (isLoop) {
+      modalSubtitle.innerText = "Hoe lang mag de rondrit duren?";
+    } else {
+      modalSubtitle.innerText = "Hoe wil je dat de route berekend wordt?";
+    }
+
     suggestionsBox.style.display = 'none';
     routeModal.style.display = 'flex';
   }
@@ -775,7 +864,6 @@ search_html = """
     routeModal.style.display = 'none';
   }
 
-  // Schakelt logica om of we op Tijd of Afstand optimaliseren
   function setPreference(pref) {
     currentPreference = pref;
     document.getElementById('optTime').classList.remove('selected');
@@ -801,7 +889,7 @@ search_html = """
   function startNavigation() {
     const start = startInput.value;
     const dest = destInput.value;
-    const isLoop = document.getElementById('chkLoop').checked;
+    const isLoop = chkLoop.checked;
     const avoidHighways = document.getElementById('chkHighways').checked;
     const avoidTolls = document.getElementById('chkTolls').checked;
     const avoidFerries = document.getElementById('chkFerries').checked;
@@ -809,7 +897,7 @@ search_html = """
 
     console.log("NAVIGATIE GESTART:", {
       start,
-      dest,
+      dest: isLoop ? "(Lus / Rondrit)" : dest,
       optimization: currentPreference,
       amount: routeAmount + " " + unitLabel.innerText,
       isLoop,
@@ -827,4 +915,4 @@ search_html = """
 """
 
 # Render de component
-components.html(search_html, height=480, scrolling=False)
+components.html(search_html, height=520, scrolling=False)
