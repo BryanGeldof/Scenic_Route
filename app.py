@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Strakke styling: formulier vastzetten als compacte zoekbalk
+# Strakke styling: volledig doorzichtig invoerveld op de witte balk
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,7 +43,7 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Zet het formulier vast als een compacte, strakke balk rechtsboven */
+    /* Het formulier als strakke witte balk rechtsboven */
     div[data-testid="stForm"] {
         position: fixed !important;
         top: 20px !important;
@@ -60,13 +60,18 @@ st.markdown("""
         pointer-events: auto !important;
     }
 
-    /* Zorg dat de kolommen binnen het formulier netjes naast elkaar staan */
     div[data-testid="stForm"] [data-testid="stHorizontalBlock"] {
         align-items: center !important;
         gap: 8px !important;
     }
 
-    /* Strak invoerveld zonder randen */
+    /* Maak het invoerveld 100% doorzichtig zodat het direct op het wit typt */
+    .stTextInput div[data-baseweb="input"] {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
     .stTextInput input {
         background-color: transparent !important;
         color: #0f172a !important;
@@ -80,6 +85,7 @@ st.markdown("""
     .stTextInput input:focus {
         border: none !important;
         box-shadow: none !important;
+        background-color: transparent !important;
     }
 
     .stTextInput input::placeholder {
@@ -127,7 +133,7 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk als compact formulier (zodat je probleemloos kunt typen)
+# 2. Zoekbalk als formulier
 with st.form(key="search_form"):
     col1, col2 = st.columns([5, 1])
     with col1:
