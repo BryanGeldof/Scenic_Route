@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk streng beperkt tot België (countrycodes=be) + Afstandssortering
+# 2. Zoekbalk met uitklapbaar opties-paneel
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -69,13 +69,14 @@ search_html = """
     right: 24px;
     z-index: 99999;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    width: 410px;
   }
 
   .search-container {
     display: flex;
     align-items: center;
     background: #ffffff;
-    width: 380px;
+    width: 100%;
     height: 56px;
     border-radius: 50px;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
@@ -87,7 +88,7 @@ search_html = """
     outline: none;
     background: transparent;
     padding-left: 24px;
-    padding-right: 16px;
+    padding-right: 12px;
     font-size: 16px;
     color: #1e293b;
     font-weight: 400;
@@ -96,6 +97,28 @@ search_html = """
   .search-input::placeholder {
     color: #94a3b8;
     font-weight: 300;
+  }
+
+  /* Uitklapknop (pijltje) */
+  .expand-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .expand-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: #64748b;
+    stroke-width: 2.5;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.3s ease;
   }
 
   .search-btn {
@@ -134,14 +157,14 @@ search_html = """
     position: absolute;
     top: 64px;
     left: 14px;
-    width: 310px;
+    width: 370px;
     background: #ffffff;
     border-radius: 16px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
     overflow-y: auto;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
-    max-height: 300px;
+    max-height: 280px;
   }
 
   .suggestion-item {
@@ -193,13 +216,87 @@ search_html = """
     flex-shrink: 0;
     font-weight: 500;
   }
+
+  /* Uitklapbaar Opties Venster */
+  .options-panel {
+    display: none;
+    background: #ffffff;
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    padding: 20px;
+    box-sizing: border-box;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .option-group {
+    margin-bottom: 14px;
+  }
+
+  .option-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .option-input {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 14px;
+    color: #1e293b;
+    outline: none;
+    box-sizing: border-box;
+    background: #f8fafc;
+  }
+
+  .option-input:focus {
+    border-color: #3b82f6;
+    background: #ffffff;
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #334155;
+    cursor: pointer;
+    font-weight: 400;
+  }
+
+  .checkbox-label input {
+    width: 16px;
+    height: 16px;
+    accent-color: #1e293b;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
 
 <div class="search-wrapper">
   <div class="search-container">
-    <input type="text" id="searchInput" class="search-input" placeholder="Zoek straat of plaats in België..." autocomplete="off">
+    <input type="text" id="searchInput" class="search-input" placeholder="Zoek bestemming..." autocomplete="off">
+    <button class="expand-btn" id="expandBtn" title="Opties weergeven">
+      <svg id="arrowIcon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </button>
     <button class="search-btn" onclick="triggerSearch()">
       <svg viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"></circle>
@@ -207,30 +304,87 @@ search_html = """
       </svg>
     </button>
   </div>
+  
   <div id="suggestions" class="suggestions-dropdown"></div>
+
+  <!-- Uitklapbaar venster (standaard verborgen) -->
+  <div id="optionsPanel" class="options-panel">
+    <div class="option-group">
+      <label>Beginpunt</label>
+      <input type="text" id="startInput" class="option-input" value="Huidige locatie">
+    </div>
+    
+    <div class="option-group">
+      <label>Bestemming</label>
+      <input type="text" id="destInput" class="option-input" placeholder="Bestemming...">
+    </div>
+
+    <div class="checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkLoop"> Maak een lus (rondrit)
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkHighways" checked> Autostrades vermijden
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkTolls"> Payages vermijden
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkFerries"> Veerponten vermijden
+      </label>
+    </div>
+  </div>
 </div>
 
 <script>
   const input = document.getElementById('searchInput');
+  const destInput = document.getElementById('destInput');
+  const startInput = document.getElementById('startInput');
   const suggestionsBox = document.getElementById('suggestions');
+  const expandBtn = document.getElementById('expandBtn');
+  const optionsPanel = document.getElementById('optionsPanel');
+  const arrowIcon = document.getElementById('arrowIcon');
+  
   let timeoutId = null;
-
-  // Standaard coördinaten (Wevelgem/Kortrijk regio)
   let userLat = 50.8280;
   let userLon = 3.2648;
 
-  // IP-locatie op de achtergrond ophalen ter verfijning
+  // Haal IP-locatie op en vul standaard in bij het beginpunt
   fetch('https://ipwho.is/')
     .then(response => response.json())
     .then(data => {
       if (data && data.success) {
         userLat = data.latitude;
         userLon = data.longitude;
+        startInput.value = data.city ? `${data.city} (Huidige locatie)` : "Huidige locatie";
       }
     })
     .catch(err => {
-      console.log("IP-locatie kon niet worden geladen.");
+      console.log("IP-locatie laden mislukt.");
     });
+
+  // Uitklaplogica met pijl rotatie
+  expandBtn.addEventListener('click', () => {
+    const isOpen = optionsPanel.style.display === 'block';
+    if (isOpen) {
+      optionsPanel.style.display = 'none';
+      arrowIcon.style.transform = 'rotate(0deg)';
+    } else {
+      optionsPanel.style.display = 'block';
+      arrowIcon.style.transform = 'rotate(180deg)';
+    }
+  });
+
+  // Synchroniseer hoofdzoekbalk en bestemmingsveld met elkaar
+  input.addEventListener('input', function() {
+    destInput.value = input.value;
+    handleSearchQuery(input.value);
+  });
+
+  destInput.addEventListener('input', function() {
+    input.value = destInput.value;
+    handleSearchQuery(destInput.value);
+  });
 
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
@@ -244,9 +398,8 @@ search_html = """
     return R * c;
   }
 
-  input.addEventListener('input', function() {
-    const query = input.value.trim();
-    
+  function handleSearchQuery(query) {
+    query = query.trim();
     if (query.length < 2) {
       suggestionsBox.style.display = 'none';
       return;
@@ -254,7 +407,6 @@ search_html = """
 
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      // BELANGRIJK: countrycodes=be toegevoegd zodat resultaten ALTIJD in België blijven
       const viewbox = `${userLon - 0.8},${userLat + 0.8},${userLon + 0.8},${userLat - 0.8}`;
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10&countrycodes=be&viewbox=${viewbox}&bounded=0`;
       
@@ -266,7 +418,6 @@ search_html = """
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
 
-            // Sorteer feilloos van dichtbij naar ver weg binnen België
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
@@ -292,7 +443,7 @@ search_html = """
           console.error("Fout bij ophalen suggesties:", err);
         });
     }, 250);
-  });
+  }
 
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrapper')) {
@@ -307,16 +458,30 @@ search_html = """
     }
   });
 
+  destInput.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      suggestionsBox.style.display = 'none';
+      triggerSearch();
+    }
+  });
+
   function selectSuggestion(val) {
     input.value = val;
+    destInput.value = val;
     suggestionsBox.style.display = 'none';
     triggerSearch();
   }
 
   function triggerSearch() {
-    const val = input.value;
-    if (val.trim() !== '') {
-      console.log("Navigeren naar:", val);
+    const start = startInput.value;
+    const dest = destInput.value;
+    const isLoop = document.getElementById('chkLoop').checked;
+    const avoidHighways = document.getElementById('chkHighways').checked;
+    const avoidTolls = document.getElementById('chkTolls').checked;
+    const avoidFerries = document.getElementById('chkFerries').checked;
+
+    if (dest.trim() !== '') {
+      console.log("Navigeren van", start, "naar", dest, "Loop:", isLoop, "Opties:", {avoidHighways, avoidTolls, avoidFerries});
     }
   }
 </script>
@@ -326,4 +491,4 @@ search_html = """
 """
 
 # Render de component
-components.html(search_html, height=350, scrolling=False)
+components.html(search_html, height=480, scrolling=False)
