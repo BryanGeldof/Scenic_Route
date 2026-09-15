@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met dynamische dropdown per invulveld
+# 2. Zoekbalk, uitklapmenu én de centrale route-popup (modal)
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -231,7 +231,7 @@ search_html = """
 
   .option-group {
     margin-bottom: 14px;
-    position: relative; /* Cruciaal om de dropdown hierin te verankeren */
+    position: relative;
   }
 
   .option-group label {
@@ -287,6 +287,135 @@ search_html = """
     accent-color: #1e293b;
     cursor: pointer;
   }
+
+  /* CENTRALE POPUP (MODAL OVER HET SCHERM) */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(11, 15, 25, 0.75);
+    z-index: 999999;
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal-card {
+    background: #ffffff;
+    width: 360px;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+    animation: modalPop 0.25s ease-out;
+  }
+
+  @keyframes modalPop {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 20px;
+  }
+
+  .preference-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .pref-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #f8fafc;
+  }
+
+  .pref-option input {
+    display: none;
+  }
+
+  .pref-option span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 6px;
+  }
+
+  .pref-option svg {
+    width: 22px;
+    height: 22px;
+    stroke: #64748b;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  /* Actieve selectie styling */
+  .pref-option.selected {
+    border-color: #1e293b;
+    background: #f1f5f9;
+  }
+
+  .pref-option.selected svg, .pref-option.selected span {
+    color: #1e293b;
+    stroke: #1e293b;
+  }
+
+  .depart-btn {
+    width: 100%;
+    height: 48px;
+    background-color: #1e293b;
+    color: #ffffff;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s ease, transform 0.1s ease;
+  }
+
+  .depart-btn:hover {
+    background-color: #0f172a;
+  }
+
+  .depart-btn:active {
+    transform: scale(0.98);
+  }
+
+  .close-modal {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: #94a3b8;
+    cursor: pointer;
+  }
+  .close-modal:hover {
+    color: #1e293b;
+  }
 </style>
 </head>
 <body>
@@ -298,7 +427,7 @@ search_html = """
     <button class="expand-btn" id="expandBtn" title="Opties weergeven">
       <svg id="arrowIcon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </button>
-    <button class="search-btn" onclick="triggerSearch()">
+    <button class="search-btn" onclick="openRouteModal()">
       <svg viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -335,8 +464,35 @@ search_html = """
   </div>
 </div>
 
-<!-- Universeel suggestievenster dat dynamisch verhuist -->
+<!-- Universeel suggestievenster -->
 <div id="suggestions" class="suggestions-dropdown"></div>
+
+<!-- CENTRALE POPUP (MODAL) VOOR ROUTE START -->
+<div id="routeModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">
+      Route optimalisatie
+      <button class="close-modal" onclick="closeRouteModal()">&times;</button>
+    </div>
+    <div class="modal-subtitle">Hoe wil je dat de route berekend wordt?</div>
+
+    <div class="preference-container">
+      <label class="pref-option selected" id="optTime" onclick="setPreference('time')">
+        <input type="radio" name="pref" value="time" checked>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Tijd</span>
+      </label>
+      
+      <label class="pref-option" id="optDistance" onclick="setPreference('distance')">
+        <input type="radio" name="pref" value="distance">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        <span>Afstand</span>
+      </label>
+    </div>
+
+    <button class="depart-btn" onclick="startNavigation()">Vertrek</button>
+  </div>
+</div>
 
 <script>
   const input = document.getElementById('searchInput');
@@ -350,11 +506,13 @@ search_html = """
   const mainSearchContainer = document.getElementById('mainSearchContainer');
   const startGroup = document.getElementById('startGroup');
   const destGroup = document.getElementById('destGroup');
+  const routeModal = document.getElementById('routeModal');
 
   let timeoutId = null;
   let userLat = 50.8280;
   let userLon = 3.2648;
   let activeTargetInput = null;
+  let currentPreference = 'time';
 
   // Browser geolocatie ophalen
   if (navigator.geolocation) {
@@ -415,7 +573,6 @@ search_html = """
     }
   });
 
-  // Functie om de lijst dynamisch te verplaatsen naar het actieve invoerveld
   function positionDropdown(targetField) {
     let parentWrapper = null;
     if (targetField === input) {
@@ -444,7 +601,6 @@ search_html = """
     const query = queryField.value.trim();
     activeTargetInput = queryField;
 
-    // Synchroniseer hoofdzoekbalk en bestemmingsveld indien gewenst
     if (queryField === input) {
       destInput.value = input.value;
     } else if (queryField === destInput) {
@@ -515,7 +671,7 @@ search_html = """
   }
 
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('.search-wrapper')) {
+    if (!e.target.closest('.search-wrapper') && !e.target.closest('#routeModal')) {
       suggestionsBox.style.display = 'none';
     }
   });
@@ -523,21 +679,21 @@ search_html = """
   input.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
       suggestionsBox.style.display = 'none';
-      triggerSearch();
+      openRouteModal();
     }
   });
 
   destInput.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
       suggestionsBox.style.display = 'none';
-      triggerSearch();
+      openRouteModal();
     }
   });
 
   startInput.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
       suggestionsBox.style.display = 'none';
-      triggerSearch();
+      openRouteModal();
     }
   });
 
@@ -550,10 +706,36 @@ search_html = """
       }
     }
     suggestionsBox.style.display = 'none';
-    triggerSearch();
   }
 
-  function triggerSearch() {
+  // LOGICA VOOR DE POPUP (MODAL)
+  function openRouteModal() {
+    const dest = destInput.value.trim();
+    if (dest === '') {
+      input.focus();
+      return;
+    }
+    suggestionsBox.style.display = 'none';
+    routeModal.style.display = 'flex';
+  }
+
+  function closeRouteModal() {
+    routeModal.style.display = 'none';
+  }
+
+  function setPreference(pref) {
+    currentPreference = pref;
+    document.getElementById('optTime').classList.remove('selected');
+    document.getElementById('optDistance').classList.remove('selected');
+
+    if (pref === 'time') {
+      document.getElementById('optTime').classList.add('selected');
+    } else {
+      document.getElementById('optDistance').classList.add('selected');
+    }
+  }
+
+  function startNavigation() {
     const start = startInput.value;
     const dest = destInput.value;
     const isLoop = document.getElementById('chkLoop').checked;
@@ -561,9 +743,17 @@ search_html = """
     const avoidTolls = document.getElementById('chkTolls').checked;
     const avoidFerries = document.getElementById('chkFerries').checked;
 
-    if (dest.trim() !== '') {
-      console.log("Navigeren van", start, "naar", dest, "Loop:", isLoop, "Opties:", {avoidHighways, avoidTolls, avoidFerries});
-    }
+    console.log("NAVIGATIE GESTART:", {
+      start,
+      dest,
+      optimization: currentPreference,
+      isLoop,
+      avoidHighways,
+      avoidTolls,
+      avoidFerries
+    });
+
+    closeRouteModal();
   }
 </script>
 
