@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS om het volledige kader/achtergrondvlak volledig onzichtbaar te maken
+# Styling om het zoekveld exact rechtsboven te plaatsen in de gewenste pil-vorm
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,63 +43,68 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Posysionering linksboven */
+    /* Plaats het zoekveld RECHTSBOVEN */
     .element-container {
         position: fixed !important;
-        top: 20px !important;
-        left: 20px !important;
+        top: 24px !important;
+        right: 24px !important;
+        left: auto !important;
         z-index: 99999 !important;
-        width: 340px !important;
+        width: 360px !important;
     }
 
-    /* WIS HET KADER: Maak de achtergrondcontainer volledig transparant en randloos */
-    div[data-testid="stVerticalBlock"] > div:first-child {
-        background: transparent !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-    }
-
-    /* Strakke invoervelden */
+    /* Pil-vormig zoekveld lijkend op je voorbeeld */
     .stTextInput input {
-        background-color: rgba(15, 23, 42, 0.9) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.25) !important;
-        border-radius: 12px !important;
-        padding: 10px 14px 10px 36px !important;
-        font-size: 14px !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        border: none !important;
+        border-radius: 50px !important;
+        padding: 14px 60px 14px 24px !important;
+        font-size: 15px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+        outline: none !important;
     }
 
-    /* Strakke knop */
+    .stTextInput input::placeholder {
+        color: #94a3b8 !important;
+    }
+
+    .stTextInput label {
+        display: none !important;
+    }
+
+    /* Stijl de knop zodat deze precies over de rechterkant van de pil valt als vergrootglas-knop */
+    .stButton {
+        position: absolute !important;
+        right: 4px !important;
+        top: 4px !important;
+        z-index: 100000 !important;
+    }
+
     .stButton>button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #2563eb) !important;
+        background-color: #1e293b !important;
         color: white !important;
-        border-radius: 12px !important;
+        border-radius: 50% !important;
         border: none !important;
-        padding: 10px 16px !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-        width: 100% !important;
-        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4) !important;
-        cursor: pointer;
-        margin-top: 4px;
+        width: 44px !important;
+        height: 44px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        cursor: pointer !important;
+        font-size: 16px !important;
     }
 
     .stButton>button:hover {
-        background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8) !important;
-    }
-
-    .stCheckbox label {
-        color: #ffffff !important;
-        font-size: 13px !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        background-color: #0f172a !important;
+        transform: scale(1.05);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Achtergrond Kaart (OpenStreetMap)
+# 1. Achtergrond Kaart
 m = folium.Map(
     location=[50.8503, 4.3517], 
     zoom_start=11,
@@ -109,18 +114,11 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Invoer elementen zonder enig achtergrondkader
+# 2. Zoekbalk rechtsboven met vergrootglas knop
 with st.container():
-    st.markdown("<h3 style='color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 0px;'>🗺️ Scenic Navigator</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 12px; color: #cbd5e1; text-shadow: 0 1px 3px rgba(0,0,0,0.8); margin-top: 2px; margin-bottom: 8px;'>Plan je route of schilderachtige lus</p>", unsafe_allow_html=True)
+    search_query = st.text_input("Zoeken", placeholder="Search...", label_visibility="collapsed")
     
-    search_query = st.text_input("Bestemming", placeholder="🔍 Typ bestemming of adres...", label_visibility="collapsed")
-    is_loop = st.checkbox("🔄 Maak schilderachtige lus vanaf locatie")
-    
-    if st.button("Start Route Berekenen 🚀"):
-        if is_loop:
-            st.success("🔄 Lus-modus geactiveerd!")
-        elif search_query:
-            st.success(f"🚀 Route gestart naar: **{search_query}**")
-        else:
-            st.warning("⚠️ Vul een bestemming in of kies een lus.")
+    # De knop fungeert als de ronde vergrootglas-knop rechts in de pil
+    if st.button("🔍") or search_query:
+        if search_query:
+            st.toast(f"🚀 Route gestart naar: {search_query}", icon="🗺️")
