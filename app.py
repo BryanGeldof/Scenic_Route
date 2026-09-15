@@ -32,7 +32,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Volledige Leaflet kaart + Zoekinterface in één strakke component met vrije scroll/zoom
 app_html = """
 <!DOCTYPE html>
 <html>
@@ -330,6 +329,92 @@ app_html = """
     cursor: pointer;
   }
 
+  /* Route Result Panel Links */
+  .routes-sidebar {
+    display: none;
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    z-index: 99999;
+    width: 380px;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    box-sizing: border-box;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+
+  .routes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 10px;
+  }
+
+  .routes-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .close-sidebar {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    color: #94a3b8;
+    cursor: pointer;
+  }
+  .close-sidebar:hover { color: #1e293b; }
+
+  .route-card {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .route-card:hover {
+    border-color: #3b82f6;
+    background: #f1f5f9;
+  }
+
+  .route-card.active {
+    border-color: #1e293b;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  .route-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .route-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .route-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+  }
+
   .modal-overlay {
     display: none;
     position: fixed;
@@ -395,9 +480,7 @@ app_html = """
     background: #f8fafc;
   }
 
-  .pref-option input {
-    display: none;
-  }
+  .pref-option input { display: none; }
 
   .pref-option span {
     font-size: 14px;
@@ -479,13 +562,8 @@ app_html = """
     transition: background-color 0.2s ease, transform 0.1s ease;
   }
 
-  .depart-btn:hover {
-    background-color: #0f172a;
-  }
-
-  .depart-btn:active {
-    transform: scale(0.98);
-  }
+  .depart-btn:hover { background-color: #0f172a; }
+  .depart-btn:active { transform: scale(0.98); }
 
   .close-modal {
     background: transparent;
@@ -494,14 +572,23 @@ app_html = """
     color: #94a3b8;
     cursor: pointer;
   }
-  .close-modal:hover {
-    color: #1e293b;
-  }
+  .close-modal:hover { color: #1e293b; }
 </style>
 </head>
 <body>
 
 <div id="map"></div>
+
+<!-- Linkse zijbalk voor voorgestelde routes -->
+<div id="routesSidebar" class="routes-sidebar">
+  <div class="routes-header">
+    <div class="routes-title">Voorgestelde Routes</div>
+    <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
+  </div>
+  <div id="routesListContainer">
+    <!-- Wordt dynamisch gevuld -->
+  </div>
+</div>
 
 <div class="search-wrapper">
   <div class="search-container" id="mainSearchContainer" style="position: relative;">
@@ -595,12 +682,12 @@ app_html = """
 </div>
 
 <script>
-  // Initialiseer Leaflet Kaart
   let map = L.map('map', { zoomControl: false, attributionControl: false }).setView([50.8280, 3.2648], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
   let startMarker = null;
   let destMarker = null;
+  let activeRouteLayers = [];
 
   let userLat = 50.8280;
   let userLon = 3.2648;
@@ -620,6 +707,8 @@ app_html = """
   const destGroup = document.getElementById('destGroup');
   const routeModal = document.getElementById('routeModal');
   const modalSubtitle = document.getElementById('modalSubtitle');
+  const routesSidebar = document.getElementById('routesSidebar');
+  const routesListContainer = document.getElementById('routesListContainer');
   
   const routeValueInput = document.getElementById('routeValueInput');
   const valueLabel = document.getElementById('valueLabel');
@@ -630,12 +719,10 @@ app_html = """
   let activeTargetInput = null;
   let currentPreference = 'time';
 
-  // Update Markers op de kaart
   function updateMapMarkers() {
     if (startMarker) map.removeLayer(startMarker);
     if (destMarker) map.removeLayer(destMarker);
 
-    // Zwarte marker voor vertrek
     const blackIcon = L.divIcon({
       className: 'custom-marker',
       html: '<div style="background-color: #1e293b; width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div></div>',
@@ -644,7 +731,6 @@ app_html = """
     });
     startMarker = L.marker([userLat, userLon], { icon: blackIcon }).addTo(map);
 
-    // Witte marker voor bestemming (enkel als het geen lus is)
     if (!chkLoop.checked && destLat && destLon) {
       const whiteIcon = L.divIcon({
         className: 'custom-marker',
@@ -654,7 +740,6 @@ app_html = """
       });
       destMarker = L.marker([destLat, destLon], { icon: whiteIcon }).addTo(map);
 
-      // Fit bounds zodat beide markers mooi zichtbaar zijn
       let group = new L.featureGroup([startMarker, destMarker]);
       map.fitBounds(group.getBounds(), { padding: [80, 80] });
     } else {
@@ -662,7 +747,6 @@ app_html = """
     }
   }
 
-  // Geolocatie ophalen bijstarten
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -685,9 +769,7 @@ app_html = """
           startInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
         });
       },
-      (error) => {
-        fallbackIpLocation();
-      },
+      () => { fallbackIpLocation(); },
       { timeout: 10000, enableHighAccuracy: true }
     );
   } else {
@@ -791,14 +873,12 @@ app_html = """
             data.forEach(item => {
               item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
             });
-
             data.sort((a, b) => a.distance - b.distance);
 
             let html = '';
             data.forEach(item => {
               const name = item.display_name.replace(/'/g, "\\'");
               let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
-              
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${item.lat}, ${item.lon})">
                          <div class="suggestion-content">
                            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
@@ -813,9 +893,7 @@ app_html = """
             suggestionsBox.style.display = 'none';
           }
         })
-        .catch(err => {
-          console.error("Fout bij ophalen suggesties:", err);
-        });
+        .catch(err => console.error(err));
     }, 250);
   }
 
@@ -827,12 +905,8 @@ app_html = """
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   document.addEventListener('click', function(e) {
@@ -878,9 +952,7 @@ app_html = """
       destLon = userLon;
     } else {
       modalSubtitle.innerText = "Hoe wil je dat de route berekend wordt?";
-      if (dest === '' && mainVal !== '') {
-        destInput.value = mainVal;
-      }
+      if (dest === '' && mainVal !== '') { destInput.value = mainVal; }
     }
 
     suggestionsBox.style.display = 'none';
@@ -889,6 +961,11 @@ app_html = """
 
   function closeRouteModal() {
     routeModal.style.display = 'none';
+  }
+
+  function closeRoutesSidebar() {
+    routesSidebar.style.display = 'none';
+    clearRoutes();
   }
 
   function setPreference(pref) {
@@ -913,27 +990,134 @@ app_html = """
     }
   }
 
-  function startNavigation() {
-    const isLoop = chkLoop.checked;
-    const start = startInput.value;
-    const dest = destInput.value;
-    const avoidHighways = document.getElementById('chkHighways').checked;
-    const avoidTolls = document.getElementById('chkTolls').checked;
-    const avoidFerries = document.getElementById('chkFerries').checked;
-    const routeAmount = routeValueInput.value;
+  function clearRoutes() {
+    activeRouteLayers.forEach(layer => map.removeLayer(layer));
+    activeRouteLayers = [];
+  }
 
-    console.log("NAVIGATIE GESTART:", {
-      start,
-      dest: isLoop ? "(Lus / Rondrit)" : dest,
-      optimization: currentPreference,
-      amount: routeAmount + " " + unitLabel.innerText,
-      isLoop,
-      avoidHighways,
-      avoidTolls,
-      avoidFerries
+  // Genereer routes op basis van instellingen en checkboxes
+  async function startNavigation() {
+    closeRouteModal();
+    clearRoutes();
+
+    const isLoop = chkLoop.checked;
+    const avoidHighways = document.getElementById('chkHighways').checked;
+    const targetValue = parseFloat(routeValueInput.value);
+    
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Routes berekenen...</div>';
+    routesSidebar.style.display = 'block';
+
+    let routeOptions = [];
+
+    if (isLoop) {
+      // Bereken richtingscoördinaten voor lussen op basis van gewenste afstand/tijd (gemiddeld 50km/u indien tijd)
+      let targetKm = currentPreference === 'time' ? targetValue * 45 : targetValue;
+      let radius = (targetKm / 4) / 111; // ruwe benadering in graden
+
+      let waypointsList = [
+        { name: "Noordelijke Rondrit", latOffset: radius, lonOffset: 0 },
+        { name: "Oostelijke Rondrit", latOffset: 0, lonOffset: radius },
+        { name: "Zuidelijke Rondrit", latOffset: -radius, lonOffset: 0 }
+      ];
+
+      for (let i = 0; i < waypointsList.length; i++) {
+        let wp = waypointsList[i];
+        let midLat = userLat + wp.latOffset;
+        let midLon = userLon + wp.lonOffset;
+        
+        let url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${midLon},${midLat};${userLon},${userLat}?overview=full&geometries=geojson`;
+        if (avoidHighways) { url += "&exclude=motorway"; }
+
+        try {
+          let response = await fetch(url);
+          let data = await response.json();
+          if (data.routes && data.routes.length > 0) {
+            let r = data.routes[0];
+            routeOptions.push({
+              name: wp.name,
+              distance: (r.distance / 1000).toFixed(1),
+              duration: (r.duration / 3600).toFixed(1),
+              geometry: r.geometry,
+              color: i === 0 ? '#3b82f6' : (i === 1 ? '#10b981' : '#f59e0b')
+            });
+          }
+        } catch(e) { console.error(e); }
+      }
+    } else {
+      // Normale route van A naar B met alternatieven
+      if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
+      
+      let url = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
+      if (avoidHighways) { url += "&exclude=motorway"; }
+
+      try {
+        let response = await fetch(url);
+        let data = await response.json();
+        if (data.routes && data.routes.length > 0) {
+          data.routes.forEach((r, index) => {
+            routeOptions.push({
+              name: index === 0 ? "Snellste Route" : `Alternatieve Route ${index}`,
+              distance: (r.distance / 1000).toFixed(1),
+              duration: (r.duration / 3600).toFixed(1),
+              geometry: r.geometry,
+              color: index === 0 ? '#1e293b' : (index === 1 ? '#3b82f6' : '#10b981')
+            });
+          });
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    renderRouteResults(routeOptions);
+  }
+
+  function renderRouteResults(routes) {
+    if (routes.length === 0) {
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden met deze filters.</div>';
+      return;
+    }
+
+    let html = '';
+    routes.forEach((route, index) => {
+      // Teken lijn op kaart
+      let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      let polyline = L.polyline(coords, { color: route.color, weight: index === 0 ? 6 : 4, opacity: 0.8 }).addTo(map);
+      activeRouteLayers.push(polyline);
+
+      polyline.on('click', () => { selectRouteCard(index); });
+
+      html += `
+        <div class="route-card ${index === 0 ? 'active' : ''}" id="routeCard_${index}" onclick="selectRouteCard(${index})">
+          <div class="route-card-title">
+            <div class="route-dot" style="background-color: ${route.color};"></div>
+            ${route.name}
+          </div>
+          <div class="route-stats">
+            <span>🚗 ${route.distance} km</span>
+            <span>⏱️ ${route.duration} uur</span>
+          </div>
+        </div>
+      `;
     });
 
-    closeRouteModal();
+    routesListContainer.innerHTML = html;
+
+    // Zoom naar de eerste route
+    if (activeRouteLayers.length > 0) {
+      map.fitBounds(activeRouteLayers[0].getBounds(), { padding: [50, 50] });
+    }
+  }
+
+  window.selectRouteCard = function(index) {
+    document.querySelectorAll('.route-card').forEach((card, idx) => {
+      if (idx === index) {
+        card.classList.add('active');
+        activeRouteLayers[idx].setStyle({ weight: 6, opacity: 1 });
+        map.fitBounds(activeRouteLayers[idx].getBounds(), { padding: [50, 50] });
+      } else {
+        card.classList.remove('active');
+        activeRouteLayers[idx].setStyle({ weight: 4, opacity: 0.5 });
+      }
+    });
   }
 </script>
 
