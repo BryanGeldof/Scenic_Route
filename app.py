@@ -1008,12 +1008,10 @@ app_html = """
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      // Straalberekening op basis van omtrek
       let radiusKm = (targetKm / (2 * Math.PI)) * 0.7;
       let radiusLat = radiusKm / 111;
       let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-      // Verschillende richtingen (Noord, Oost, West) zodat het startpunt op de *rand* van de cirkel ligt
       let variations = [
         { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
         { name: "Rondrit Oosten", dirAngle: 0 },
@@ -1023,21 +1021,19 @@ app_html = """
       for (let i = 0; i < variations.length; i++) {
         let v = variations[i];
         
-        // Verschuif het middelpunt zodat het startpunt op de rand van de cirkel ligt
         let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
         let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
         let waypoints = [`${userLon},${userLat}`];
-        let radiuses = [`50`]; // Starttolerantie
+        let radiuses = [`50`];
 
-        // 4 waypoints verdeeld per 90 graden rondom het nieuwe middelpunt
         let numPoints = 4;
         for (let j = 0; j < numPoints; j++) {
           let angle = j * (2 * Math.PI / numPoints);
           let pLat = centerLat + (radiusLat * Math.sin(angle));
           let pLon = centerLon + (radiusLon * Math.cos(angle));
           waypoints.push(`${pLon},${pLat}`);
-          radiuses.push(`150`); // 150m tolerantie zodat OSRM doorgaande wegen verkiest boven doodlopende steegjes
+          radiuses.push(`400`); // 400m tolerantie zodat OSRM doorgaande wegen pakt en woonerven links laat liggen
         }
         waypoints.push(`${userLon},${userLat}`);
         radiuses.push(`50`);
@@ -1045,9 +1041,10 @@ app_html = """
         let waypointsStr = waypoints.join(';');
         let radiusesStr = radiuses.join(';');
 
-        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}`;
+        // Voeg &exclude=residential toe zodat kleine woonstraten en doodlopende woonerf-structuren worden gemeden
+        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}&exclude=residential`;
         if (avoidHighways) {
-          url += "&exclude=motorway";
+          url += ",motorway";
         }
 
         try {
@@ -1068,9 +1065,9 @@ app_html = """
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
-      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
+      let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson&exclude=residential`;
       if (avoidHighways) {
-        url += "&exclude=motorway";
+        url += ",motorway";
       }
 
       try {
