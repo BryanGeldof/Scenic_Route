@@ -57,7 +57,7 @@ with st.container():
     
     st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met echte live API-autocomplete voor álle straten en locaties
+# 2. Zoekbalk met automatische afstandssortering (van dichtbij naar ver weg)
 search_html = """
 <!DOCTYPE html>
 <html>
@@ -141,7 +141,7 @@ search_html = """
     overflow-y: auto;
     z-index: 100000;
     border: 1px solid rgba(0,0,0,0.06);
-    max-height: 280px;
+    max-height: 300px;
   }
 
   .suggestion-item {
@@ -152,7 +152,8 @@ search_html = """
     border-bottom: 1px solid #f1f5f9;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    gap: 8px;
     transition: background 0.15s ease;
     text-align: left;
   }
@@ -165,6 +166,13 @@ search_html = """
     background-color: #f8fafc;
   }
 
+  .suggestion-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+  }
+
   .suggestion-item svg {
     width: 16px;
     height: 16px;
@@ -174,6 +182,16 @@ search_html = """
     stroke-linecap: round;
     stroke-linejoin: round;
     flex-shrink: 0;
+  }
+
+  .distance-badge {
+    font-size: 11px;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 3px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    font-weight: 500;
   }
 </style>
 </head>
@@ -197,7 +215,36 @@ search_html = """
   const suggestionsBox = document.getElementById('suggestions');
   let timeoutId = null;
 
-  // Live zoekopdrachten via de OpenStreetMap Nominatim API bij elke letter
+  // Standaard coördinaten (Brussel) als fallback als GPS niet lukt
+  let userLat = 50.8503;
+  let userLon = 4.3517;
+
+  // Vraag de echte locatie van de gebruiker op via de browser
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        userLat = position.coords.latitude;
+        userLon = position.coords.longitude;
+      },
+      (error) => {
+        console.log("Locatie niet gedeeld, standaard coordinaten worden gebruikt.");
+      }
+    );
+  }
+
+  // Haversine formule om de afstand in kilometers te berekenen tussen 2 GPS-punten
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Straal van de aarde in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Afstand in km
+  }
+
   input.addEventListener('input', function() {
     const query = input.value.trim();
     
@@ -206,22 +253,35 @@ search_html = """
       return;
     }
 
-    // Voorkom teveel API-aanvragen per milliseconde (debounce)
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      // Vraag live suggesties op in het Nederlands
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
+      // Vraag 10 resultaten op via OpenStreetMap
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=10`;
       
       fetch(url, { headers: { 'Accept-Language': 'nl' } })
         .then(response => response.json())
         .then(data => {
           if (data && data.length > 0) {
+            // Bereken de afstand voor elk resultaat t.o.v. de gebruiker
+            data.forEach(item => {
+              item.distance = calculateDistance(userLat, userLon, parseFloat(item.lat), parseFloat(item.lon));
+            });
+
+            // Sorteer van dichtbij naar ver weg (kleine afstand eerst)
+            data.sort((a, b) => a.distance - b.distance);
+
             let html = '';
             data.forEach(item => {
               const name = item.display_name.replace(/'/g, "\\'");
+              // Netjes afronden van de afstand
+              let distText = item.distance < 1 ? Math.round(item.distance * 1000) + ' m' : item.distance.toFixed(1) + ' km';
+              
               html += `<div class="suggestion-item" onclick="selectSuggestion('${name}')">
-                         <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                         ${item.display_name}
+                         <div class="suggestion-content">
+                           <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                           <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.display_name}</span>
+                         </div>
+                         <span class="distance-badge">${distText}</span>
                        </div>`;
             });
             suggestionsBox.innerHTML = html;
@@ -236,14 +296,12 @@ search_html = """
     }, 250);
   });
 
-  // Klik buiten de zoekbalk sluit de suggesties
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrapper')) {
       suggestionsBox.style.display = 'none';
     }
   });
 
-  // Enter toets indrukken
   input.addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
       suggestionsBox.style.display = 'none';
