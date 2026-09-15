@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Strakke styling met actieve focus voor het invoerveld
+# Strakke styling voor het formulier en de zoekbalk
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -43,19 +43,13 @@ st.markdown("""
         z-index: 0;
     }
 
-    /* Posysionering van de zoekbalk container rechtsboven met actieve muisinteractie */
-    .element-container {
+    /* Maak van het formulier één strakke witte zoekbalk rechtsboven */
+    div[data-testid="stForm"] {
         position: fixed !important;
         top: 20px !important;
         right: 20px !important;
-        left: auto !important;
         z-index: 99999 !important;
         width: 380px !important;
-        pointer-events: auto !important;
-    }
-
-    /* De witte balk container */
-    div[data-testid="stVerticalBlock"] > div:first-child {
         background: #ffffff !important;
         padding: 6px 10px !important;
         border-radius: 14px !important;
@@ -64,11 +58,7 @@ st.markdown("""
         pointer-events: auto !important;
     }
 
-    /* Zorg dat het tekstveld volledig klikbaar en focusbaar is */
-    .stTextInput {
-        pointer-events: auto !important;
-    }
-
+    /* Verberg standaard randen van het invoerveld binnen het formulier */
     .stTextInput input {
         background-color: transparent !important;
         color: #0f172a !important;
@@ -76,7 +66,6 @@ st.markdown("""
         box-shadow: none !important;
         padding: 8px 4px !important;
         font-size: 15px !important;
-        pointer-events: auto !important;
         outline: none !important;
     }
 
@@ -93,12 +82,12 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Strakke knop met ingebouwd wit vergrootglas */
-    .stButton {
-        pointer-events: auto !important;
+    /* Strakke verzendknop met ingebouwd wit vergrootglas */
+    .stFormSubmitButton {
+        margin-top: 2px !important;
     }
 
-    .stButton>button {
+    .stFormSubmitButton button {
         background-color: #0f172a !important;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E") !important;
         background-repeat: no-repeat !important;
@@ -111,16 +100,15 @@ st.markdown("""
         padding: 0 !important;
         cursor: pointer !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
-        margin-top: 2px !important;
     }
 
-    .stButton>button:hover {
+    .stFormSubmitButton button:hover {
         background-color: #1e293b !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Kaart initialiseren met schone OpenStreetMap tiles
+# 1. Kaart initialiseren
 m = folium.Map(
     location=[50.8503, 4.3517], 
     zoom_start=11,
@@ -130,14 +118,16 @@ m = folium.Map(
 )
 st_folium(m, use_container_width=True, height=900)
 
-# 2. Zoekbalk met werkende focus en invoer
-with st.container():
+# 2. Zoekbalk als Formulier (zodat je zorgeloos kunt typen zonder dat de focus verspringt)
+with st.form(key="search_form"):
     col1, col2 = st.columns([5, 1])
     with col1:
         search_query = st.text_input("Zoeken", placeholder="Typ bestemming...", label_visibility="collapsed")
     with col2:
-        search_clicked = st.button("Zoek")
+        submitted = st.form_submit_button("Zoek")
         
-    if search_clicked or search_query:
+    if submitted:
         if search_query.strip():
             st.toast(f"🚀 Route gestart naar: **{search_query}**", icon="🗺️")
+        else:
+            st.toast("⚠️ Typ eerst een bestemming in.", icon="⚠️")
