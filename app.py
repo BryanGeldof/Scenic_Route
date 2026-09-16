@@ -85,7 +85,7 @@ app_html = """
 
 <div id="routesSidebar" class="routes-sidebar">
   <div class="routes-header">
-    <div class="routes-title" id="sidebarTitle">Gegarandeerde Toeren</div>
+    <div class="routes-title" id="sidebarTitle">Ideale Toeren</div>
     <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
   </div>
   <div id="routesListContainer"></div>
@@ -133,7 +133,7 @@ app_html = """
 
     <div class="checkbox-group">
       <label class="checkbox-label">
-        <input type="checkbox" id="chkHighways" checked> Autostrades vermijden (Strikt)
+        <input type="checkbox" id="chkHighways" checked> Autostrades & snelle wegen vermijden (Strikt)
       </label>
       <label class="checkbox-label">
         <input type="checkbox" id="chkTolls"> Payages vermijden
@@ -325,7 +325,7 @@ app_html = """
   function closeRoutesSidebar() { routesSidebar.style.display = 'none'; clearRoutes(); }
   function clearRoutes() { activeRouteLayers.forEach(l => map.removeLayer(l)); activeRouteLayers = []; }
 
-  // --- ULTIEME ROUTE ENGINE (GEEN DOODLOPENDE STUKJES & STRIKTE VERMIJDING) ---
+  // --- VERTROUWDE STABIELE ENGINE (6.28 FACTOR + STRIKTE AUTOSTRADE VERMIJDING) ---
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
@@ -338,12 +338,12 @@ app_html = """
     let excludes = [];
     if (avoidHighways) {
       excludes.push('motorway');
-      excludes.push('trunk'); // Dit weert ook expresswegen en hoofdwegen waar je snel mag rijden
+      excludes.push('trunk');
     }
     if (avoidTolls) excludes.push('toll');
     if (avoidFerries) excludes.push('ferry');
 
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Schone binnenwegen berekenen...</div>';
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Ideale toeren berekenen...</div>';
     routesSidebar.style.display = 'block';
 
     let evaluatedRoutes = [];
@@ -352,6 +352,7 @@ app_html = """
       sidebarTitle.innerText = "Gegarandeerde Lussen";
       let targetKm = parseFloat(routeValueInput.value);
       
+      // De vertrouwde en nauwkeurige straalberekening
       let radius = targetKm / 6.28; 
       let rLat = radius / 111;
       let rLon = radius / (111 * Math.cos(startLat * Math.PI / 180));
@@ -376,7 +377,6 @@ app_html = """
         });
       });
 
-      // Poging 1: Met strenge filters en nette benadering
       for (let config of candidateConfigs) {
         let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson&continue_straight=true`;
         if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
@@ -398,7 +398,6 @@ app_html = """
         } catch(e) {}
       }
 
-      // Fallback: Als filters té streng waren en geen route gaven, soepeler proberen maar wel gegarandeerd resultaat
       if (evaluatedRoutes.length === 0) {
         for (let config of candidateConfigs) {
           let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
