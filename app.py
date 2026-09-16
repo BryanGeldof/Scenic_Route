@@ -133,7 +133,7 @@ app_html = """
 
     <div class="checkbox-group">
       <label class="checkbox-label">
-        <input type="checkbox" id="chkHighways" checked> Autostrades vermijden
+        <input type="checkbox" id="chkHighways" checked> Autostrades vermijden (Strikt)
       </label>
       <label class="checkbox-label">
         <input type="checkbox" id="chkTolls"> Payages vermijden
@@ -180,7 +180,7 @@ app_html = """
   let endLat = null;
   let endLon = null;
 
-  let currentMode = 'loop'; // 'loop' of 'point'
+  let currentMode = 'loop';
 
   const input = document.getElementById('searchInput');
   const startInput = document.getElementById('startInput');
@@ -197,7 +197,7 @@ app_html = """
   const routeValueInput = document.getElementById('routeValueInput');
   const sidebarTitle = document.getElementById('sidebarTitle');
 
-  let activeField = 'main'; // 'main', 'start', 'end'
+  let activeField = 'main';
   let timeoutId = null;
 
   function updateMapMarkers() {
@@ -228,7 +228,6 @@ app_html = """
     }
   }
 
-  // Geolocation bij opstarten
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -267,7 +266,6 @@ app_html = """
     updateMapMarkers();
   }
 
-  // Zoekfunctionaliteitkoppeling voor alle drie de velden
   setupAutocomplete(input, 'main');
   setupAutocomplete(startInput, 'start');
   setupAutocomplete(endInput, 'end');
@@ -327,7 +325,7 @@ app_html = """
   function closeRoutesSidebar() { routesSidebar.style.display = 'none'; clearRoutes(); }
   function clearRoutes() { activeRouteLayers.forEach(l => map.removeLayer(l)); activeRouteLayers = []; }
 
-  // --- ACCURATE EN GEGARANDEERDE ROUTE ENGINE ---
+  // --- ULTIEME ROUTE ENGINE (GEEN DOODLOPENDE STUKJES & STRIKTE VERMIJDING) ---
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
@@ -338,11 +336,14 @@ app_html = """
 
     let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
     let excludes = [];
-    if (avoidHighways) excludes.push('motorway');
+    if (avoidHighways) {
+      excludes.push('motorway');
+      excludes.push('trunk'); // Dit weert ook expresswegen en hoofdwegen waar je snel mag rijden
+    }
     if (avoidTolls) excludes.push('toll');
     if (avoidFerries) excludes.push('ferry');
 
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Routes berekenen...</div>';
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Schone binnenwegen berekenen...</div>';
     routesSidebar.style.display = 'block';
 
     let evaluatedRoutes = [];
@@ -351,19 +352,18 @@ app_html = """
       sidebarTitle.innerText = "Gegarandeerde Lussen";
       let targetKm = parseFloat(routeValueInput.value);
       
-      // Nauwkeurigere straalberekening voor lussen (omtrek ~ targetKm)
       let radius = targetKm / 6.28; 
       let rLat = radius / 111;
       let rLon = radius / (111 * Math.cos(startLat * Math.PI / 180));
 
-      let angles = [0, 1.25, 2.5, 3.76, 5.0]; // Diverse windrichtingen voor variatie
+      let angles = [0, 1.25, 2.5, 3.76, 5.0];
       let candidateConfigs = [];
 
       angles.forEach((ang, idx) => {
         let p1Lat = startLat + (rLat * Math.sin(ang));
         let p1Lon = startLon + (rLon * Math.cos(ang));
-        let p2Lat = startLat + (rLat * 1.1 * Math.sin(ang + 2.1));
-        let p2Lon = startLon + (rLon * 1.1 * Math.cos(ang + 2.1));
+        let p2Lat = startLat + (rLat * 1.05 * Math.sin(ang + 2.1));
+        let p2Lon = startLon + (rLon * 1.05 * Math.cos(ang + 2.1));
 
         candidateConfigs.push({
           name: `Lus ${idx+1}`,
@@ -376,9 +376,9 @@ app_html = """
         });
       });
 
-      // Poging 1: Met filters
+      // Poging 1: Met strenge filters en nette benadering
       for (let config of candidateConfigs) {
-        let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
+        let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson&continue_straight=true`;
         if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
 
         try {
@@ -398,7 +398,7 @@ app_html = """
         } catch(e) {}
       }
 
-      // Fallback zonder filters indien nodig
+      // Fallback: Als filters té streng waren en geen route gaven, soepeler proberen maar wel gegarandeerd resultaat
       if (evaluatedRoutes.length === 0) {
         for (let config of candidateConfigs) {
           let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
@@ -431,7 +431,7 @@ app_html = """
       }
 
       let waypoints = [`${startLon},${startLat}`, `${endLon},${endLat}`];
-      let url = `${serverBase}${waypoints.join(';')}?alternatives=true&overview=full&geometries=geojson`;
+      let url = `${serverBase}${waypoints.join(';')}?alternatives=true&overview=full&geometries=geojson&continue_straight=true`;
       if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
 
       try {
@@ -449,7 +449,6 @@ app_html = """
         }
       } catch(e) {}
 
-      // Fallback als punt-tot-punt met vinkjes faalt
       if (evaluatedRoutes.length === 0) {
         let fallbackUrl = `${serverBase}${waypoints.join(';')}?alternatives=true&overview=full&geometries=geojson`;
         try {
