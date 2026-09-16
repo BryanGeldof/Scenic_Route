@@ -1008,12 +1008,10 @@ app_html = """
     if (isLoop) {
       let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
       
-      // Straalberekening op basis van omtrek
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.7;
+      let radiusKm = (targetKm / (2 * Math.PI)) * 0.75;
       let radiusLat = radiusKm / 111;
       let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-      // Verschillende richtingen (Noord, Oost, West) zodat het startpunt op de *rand* van de cirkel ligt
       let variations = [
         { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
         { name: "Rondrit Oosten", dirAngle: 0 },
@@ -1023,24 +1021,22 @@ app_html = """
       for (let i = 0; i < variations.length; i++) {
         let v = variations[i];
         
-        // Verschuif het middelpunt zodat het startpunt op de rand van de cirkel ligt
         let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
         let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
 
         let waypoints = [`${userLon},${userLat}`];
-        let radiuses = [`50`]; // Starttolerantie
+        let radiuses = [`200`];
 
-        // 4 waypoints verdeeld per 90 graden rondom het nieuwe middelpunt
         let numPoints = 4;
         for (let j = 0; j < numPoints; j++) {
           let angle = j * (2 * Math.PI / numPoints);
           let pLat = centerLat + (radiusLat * Math.sin(angle));
           let pLon = centerLon + (radiusLon * Math.cos(angle));
           waypoints.push(`${pLon},${pLat}`);
-          radiuses.push(`150`); // 150m tolerantie zodat OSRM doorgaande wegen verkiest boven doodlopende steegjes
+          radiuses.push(`500`);
         }
         waypoints.push(`${userLon},${userLat}`);
-        radiuses.push(`50`);
+        radiuses.push(`200`);
 
         let waypointsStr = waypoints.join(';');
         let radiusesStr = radiuses.join(';');
@@ -1095,7 +1091,7 @@ app_html = """
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand of vink autostrades tijdelijk aan.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
       return;
     }
 
@@ -1132,18 +1128,18 @@ app_html = """
     document.querySelectorAll('.route-card').forEach((card, idx) => {
       if (idx === index) {
         card.classList.add('active');
-        activeRouteLayers[idx].setStyle({ weight: 6, opacity: 1 });
-        map.fitBounds(activeRouteLayers[idx].getBounds(), { padding: [50, 50] });
+        if (activeRouteLayers[idx]) {
+          activeRouteLayers[idx].bringToFront();
+          map.fitBounds(activeRouteLayers[idx].getBounds(), { padding: [50, 50] });
+        }
       } else {
         card.classList.remove('active');
-        activeRouteLayers[idx].setStyle({ weight: 4, opacity: 0.5 });
       }
     });
-  }
+  };
 </script>
-
 </body>
 </html>
 """
 
-components.html(app_html, height=900, scrolling=False)
+components.html(app_html, height=800, scrolling=False)
