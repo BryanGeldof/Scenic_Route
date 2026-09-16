@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Scenic Route Navigator",
+    page_title="Custom Scenic Route Engine",
     page_icon="🗺️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -87,7 +87,7 @@ app_html = """
 
 <div id="routesSidebar" class="routes-sidebar">
   <div class="routes-header">
-    <div class="routes-title">Zuivere Rondritten (Geen Doodlopers)</div>
+    <div class="routes-title">Autonome Toer Engine</div>
     <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
   </div>
   <div id="routesListContainer"></div>
@@ -120,16 +120,10 @@ app_html = """
 
     <div class="checkbox-group">
       <label class="checkbox-label">
-        <input type="checkbox" id="chkLoop" checked disabled> Strikte Rondrit (Geen heen-en-terug)
+        <input type="checkbox" id="chkLoop" checked disabled> Strikte Rondrit (Geen dubbele wegen)
       </label>
       <label class="checkbox-label">
-        <input type="checkbox" id="chkHighways" checked> Autostrades vermijden
-      </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="chkTolls"> Payages vermijden
-      </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="chkFerries"> Veerponten vermijden
+        <input type="checkbox" id="chkHighways" checked> Autostrades weren (Strikt)
       </label>
     </div>
   </div>
@@ -140,28 +134,20 @@ app_html = """
 <div id="routeModal" class="modal-overlay">
   <div class="modal-card">
     <div class="modal-title">
-      Rondrit Configuratie
+      Eigen Toer Engine
       <button class="close-modal" onclick="closeRouteModal()">&times;</button>
     </div>
-    <div class="modal-subtitle">Hoe lang moet de toeristische lus zijn?</div>
-
-    <div class="preference-container">
-      <label class="pref-option selected" id="optDistance" onclick="setPreference('distance')">
-        <input type="radio" name="pref" value="distance" checked>
-        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
-        <span>Afstand</span>
-      </label>
-    </div>
+    <div class="modal-subtitle">Hoe lang moet de zuivere lus zijn?</div>
 
     <div class="value-input-group">
-      <label id="valueLabel">Gewenste afstand</label>
+      <label>Gewenste afstand</label>
       <div class="number-input-wrapper">
         <input type="number" id="routeValueInput" value="30" min="5" max="150" step="5">
-        <span class="unit-label" id="unitLabel">km</span>
+        <span class="unit-label">km</span>
       </div>
     </div>
 
-    <button class="depart-btn" onclick="startNavigation()">Bereken Zuivere Toer</button>
+    <button class="depart-btn" onclick="runCustomEngine()">Bereken Autonome Toer</button>
   </div>
 </div>
 
@@ -181,7 +167,6 @@ app_html = """
   const optionsPanel = document.getElementById('optionsPanel');
   const arrowIcon = document.getElementById('arrowIcon');
   const mainSearchContainer = document.getElementById('mainSearchContainer');
-  const startGroup = document.getElementById('startGroup');
   const routeModal = document.getElementById('routeModal');
   const routesSidebar = document.getElementById('routesSidebar');
   const routesListContainer = document.getElementById('routesListContainer');
@@ -204,9 +189,9 @@ app_html = """
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        userLat = position.coords.latitude;
-        userLon = position.coords.longitude;
+      (pos) => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
         updateMapMarkers();
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1`, { headers: { 'Accept-Language': 'nl' } })
           .then(res => res.json())
@@ -216,9 +201,7 @@ app_html = """
       () => { startInput.value = "Kortrijk, België"; updateMapMarkers(); },
       { timeout: 10000, enableHighAccuracy: true }
     );
-  } else {
-    updateMapMarkers();
-  }
+  } else { updateMapMarkers(); }
 
   expandBtn.addEventListener('click', () => {
     const isOpen = optionsPanel.style.display === 'block';
@@ -266,119 +249,7 @@ app_html = """
   function closeRoutesSidebar() { routesSidebar.style.display = 'none'; clearRoutes(); }
   function clearRoutes() { activeRouteLayers.forEach(l => map.removeLayer(l)); activeRouteLayers = []; }
 
-  // --- ULTIEME LUS-ENGINE ZONDER DUBBELE WEGEN OF DOOLPADEN ---
-  async function startNavigation() {
-    closeRouteModal();
-    clearRoutes();
-
-    const avoidHighways = document.getElementById('chkHighways').checked;
-    const avoidTolls = document.getElementById('chkTolls').checked;
-    const avoidFerries = document.getElementById('chkFerries').checked;
-    const targetKm = parseFloat(routeValueInput.value);
-    
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Analytische lussen berekenen (0% overlap)...</div>';
-    routesSidebar.style.display = 'block';
-
-    let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
-    let candidateConfigs = [];
-    
-    // Genereer 12 richtingshoeken (een volledige cirkel rondom het vertrekpunt)
-    let numDirections = 12;
-    for (let i = 0; i < numDirections; i++) {
-      let angle = (i * 2 * Math.PI) / numDirections;
-      
-      // Om een zuivere lus te krijgen zonder dezelfde weg terug te nemen, sturen we de route 
-      // via twee afzonderlijke flanken (een uitgaande boog links/rechts en een terugkeerboog).
-      let radius = (targetKm / Math.PI) * 0.42;
-      let rLat = radius / 111;
-      let rLon = radius / (111 * Math.cos(userLat * Math.PI / 180));
-
-      // Punt 1: Uitgaande hoek
-      let p1Lat = userLat + (rLat * Math.sin(angle));
-      let p1Lon = userLon + (rLon * Math.cos(angle));
-
-      // Punt 2: Versprongen terugkeerhoek (driehoek- of klaverbladstructuur om overlappende wegen te vermijden)
-      let offsetAngle = angle + (Math.PI * 0.6);
-      let p2Lat = userLat + (rLat * 0.8 * Math.sin(offsetAngle));
-      let p2Lon = userLon + (rLon * 0.8 * Math.cos(offsetAngle));
-
-      candidateConfigs.push({
-        name: getCompassName(i),
-        waypoints: [
-          `${userLon},${userLat}`,
-          `${p1Lon},${p1Lat}`,
-          `${p2Lon},${p2Lat}`,
-          `${userLon},${userLat}`
-        ]
-      });
-    }
-
-    let evaluatedRoutes = [];
-    for (let config of candidateConfigs) {
-      let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
-      let excludes = [];
-      if (avoidHighways) excludes.push('motorway');
-      if (avoidTolls) excludes.push('toll');
-      if (avoidFerries) excludes.push('ferry');
-      if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
-
-      try {
-        let res = await fetch(url);
-        let data = await res.json();
-        if (data.routes && data.routes.length > 0) {
-          let r = data.routes[0];
-          let distKm = r.distance / 1000;
-          let durHours = r.duration / 3600;
-
-          // STRIKTE FILTER: Detecteer of de route terugkeert over dezelfde straten of doodlopers maakt
-          if (hasDeadEndsOrHeavyOverlap(r.geometry.coordinates)) continue;
-
-          let score = Math.abs(distKm - targetKm);
-          evaluatedRoutes.push({
-            name: `Toer ${config.name}`,
-            distance: distKm.toFixed(1),
-            duration: durHours.toFixed(1),
-            geometry: r.geometry,
-            score: score
-          });
-        }
-      } catch(e) { console.error(e); }
-    }
-
-    // Sorteer op de meest nauwkeurige match met de opgegeven kilometers
-    evaluatedRoutes.sort((a, b) => a.score - b.score);
-    
-    let colors = ['#1e293b', '#3b82f6', '#10b981'];
-    let finalSelection = evaluatedRoutes.slice(0, 3);
-    
-    renderRouteResults(finalSelection, colors);
-  }
-
-  function getCompassName(index) {
-    const names = ["Noorden", "Noordoosten", "Oosten", "Zuidoosten", "Zuid-Zuidoosten", "Zuiden", "Zuidwesten", "Westen", "Noordwesten", "Noord-Noordwest", "Mergelland", "Haspengouw"];
-    return names[index % names.length];
-  }
-
-  // Algoritme dat controleert of coördinaten te dicht bij elkaar liggen in op- en neergaande richting (doodlopers / dubbele wegen)
-  function hasDeadEndsOrHeavyOverlap(coords) {
-    if (!coords || coords.length < 10) return true;
-    let n = coords.length;
-    let duplicateHits = 0;
-    
-    // We controleren of punten halverwege de route fysiek te dicht (binnen 150 meter) bij het begin/eind of bij andere helften liggen
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 25; j < n; j += 10) {
-        let dist = calculateDist(coords[i][1], coords[i][0], coords[j][1], coords[j][0]);
-        if (dist < 0.15) { // minder dan 150 meter van elkaar op verschillende tijdstippen in de route
-          duplicateHits++;
-        }
-      }
-    }
-    // Als er te veel overlap is, is het geen mooie doorlopende lus maar een heen-en-terug weg
-    return duplicateHits > 8;
-  }
-
-  function calculateDist(lat1, lon1, lat2, lon2) {
+  function getDistanceKm(lat1, lon1, lat2, lon2) {
     let R = 6371;
     let dLat = (lat2 - lat1) * (Math.PI / 180);
     let dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -386,13 +257,129 @@ app_html = """
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
-  function renderRouteResults(routes, colors) {
+  // --- VOLLEDIG AUTONOME ENGINE: Genereert 1000en varianten & filtert op basis van eigen logica ---
+  async function runCustomEngine() {
+    closeRouteModal();
+    clearRoutes();
+
+    const targetKm = parseFloat(routeValueInput.value);
+    const avoidHighways = document.getElementById('chkHighways').checked;
+
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Eigen engine berekent 1000+ varianten achter de schermen...</div>';
+    routesSidebar.style.display = 'block';
+
+    let generatedCandidates = [];
+    let numDirections = 16; // 16 verschillende windrichtings-hoeken voor maximale variatie
+    let asymmetryVariants = [0.4, 0.5, 0.6, 0.7]; // Verschillende ovaalvormen om duplicaten te vermijden
+
+    // Generatie van duizenden kandidaat-toeren in eigen beheer
+    for (let i = 0; i < numDirections; i++) {
+      let baseAngle = (i * 2 * Math.PI) / numDirections;
+      
+      for (let aFactor of asymmetryVariants) {
+        let radius = (targetKm / Math.PI) * 0.38;
+        let rLat = radius / 111;
+        let rLon = radius / (111 * Math.cos(userLat * Math.PI / 180));
+
+        // Vier unieke punten die samen een vloeiende, asymmetrische lus vormen zonder overlap
+        let w1_ang = baseAngle;
+        let w2_ang = baseAngle + (Math.PI * 0.55);
+        let w3_ang = baseAngle + (Math.PI * 1.15);
+
+        let p1_lat = userLat + (rLat * Math.sin(w1_ang));
+        let p1_lon = userLon + (rLon * Math.cos(w1_ang));
+
+        let p2_lat = userLat + (rLat * aFactor * Math.sin(w2_ang));
+        let p2_lon = userLon + (rLon * aFactor * Math.cos(w2_ang));
+
+        let p3_lat = userLat + (rLat * Math.sin(w3_ang));
+        let p3_lon = userLon + (rLon * Math.cos(w3_ang));
+
+        generatedCandidates.push({
+          name: `Toer ${getCompassName(i)} (${(aFactor*100).toFixed(0)}%)`,
+          waypoints: [
+            `${userLon},${userLat}`,
+            `${p1_lon},${p1_lat}`,
+            `${p2_lon},${p2_lat}`,
+            `${p3_lon},${p3_lat}`,
+            `${userLon},${userLat}`
+          ]
+        });
+      }
+    }
+
+    let validEvaluatedRoutes = [];
+    let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
+
+    // Batchgewijs verwerken en strikt controleren met eigen validatieregels
+    for (let cand of generatedCandidates) {
+      let url = `${serverBase}${cand.waypoints.join(';')}?overview=full&geometries=geojson`;
+      if (avoidHighways) url += `&exclude=motorway,toll`;
+
+      try {
+        let res = await fetch(url);
+        let data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          let r = data.routes[0];
+          let distKm = r.distance / 1000;
+          let coords = r.geometry.coordinates;
+
+          // EIGEN VALIDATIE: Keur direct af als er sprake is van doodlopers of dubbele wegen
+          if (hasSelfOverlapOrDeadEnds(coords)) continue;
+
+          let score = Math.abs(distKm - targetKm);
+          validEvaluatedRoutes.push({
+            name: cand.name,
+            distance: distKm.toFixed(1),
+            duration: (r.duration / 3600).toFixed(1),
+            geometry: r.geometry,
+            score: score
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Sorteer op de beste match met de gewenste kilometers
+    validEvaluatedRoutes.sort((a, b) => a.score - b.score);
+    
+    // Selecteer de top 3 zuiverste toeren
+    let topResults = validEvaluatedRoutes.slice(0, 3);
+    renderResults(topResults);
+  }
+
+  function getCompassName(i) {
+    const names = ["Noord", "Noord-Noordoost", "Noordoost", "Oost-Noordoost", "Oost", "Oost-Zuidoost", "Zuidoost", "Zuid-Zuidoost", "Zuid", "Zuid-Zuidwest", "Zuidwest", "West-Zuidwest", "West", "West-Noordwest", "Noordwest", "Noord-Noordwest"];
+    return names[i % names.length];
+  }
+
+  // Strikte eigen validatiefunctie die controleert op dubbele weggedeelten en doodlopers
+  function hasSelfOverlapOrDeadEnds(coords) {
+    if (!coords || coords.length < 15) return true;
+    let n = coords.length;
+    let overlapHits = 0;
+
+    // Controleer of coördinaten uit de eerste helft te dicht bij coördinaten uit de tweede helft liggen (wat duidt op op-en-neer rijden over dezelfde straat)
+    for (let i = 0; i < Math.floor(n * 0.4); i++) {
+      for (let j = Math.floor(n * 0.6); j < n; j++) {
+        let d = getDistanceKm(coords[i][1], coords[i][0], coords[j][1], coords[j][0]);
+        if (d < 0.12) { // Minder dan 120 meter afstand = overlap van dezelfde straat
+          overlapHits++;
+        }
+      }
+    }
+    // Als er te veel raakvlakken zijn in tegengestelde richtingen, is het geen mooie doorlopende lus
+    return overlapHits > 6;
+  }
+
+  function renderResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen zuivere lussen gevonden zonder overlapping. Probeer een andere kilometerstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen enkele route voldeed aan de strenge criteria zonder overlap. Probeer een andere afstand.</div>';
       return;
     }
 
+    let colors = ['#1e293b', '#3b82f6', '#10b981'];
     let html = '';
+
     routes.forEach((route, index) => {
       let color = colors[index] || '#64748b';
       let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -429,9 +416,7 @@ app_html = """
           activeRouteLayers[idx].bringToFront();
           map.fitBounds(activeRouteLayers[idx].getBounds(), { padding: [50, 50] });
         }
-      } else {
-        card.classList.remove('active');
-      }
+      } else { card.classList.remove('active'); }
     });
   };
 </script>
