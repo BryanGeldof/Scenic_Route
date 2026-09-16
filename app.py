@@ -580,7 +580,7 @@ app_html = """
 
 <div id="routesSidebar" class="routes-sidebar">
   <div class="routes-header">
-    <div class="routes-title">Voorgestelde Rondritten</div>
+    <div class="routes-title">Intelligente Rondritten</div>
     <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
   </div>
   <div id="routesListContainer"></div>
@@ -991,59 +991,73 @@ app_html = """
     activeRouteLayers = [];
   }
 
+  // --- EIGEN GEAVANCEERDE RONDELDERS-ENGINE VOOR SLIMME LUSSEN ---
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
 
     const isLoop = chkLoop.checked;
     const avoidHighways = document.getElementById('chkHighways').checked;
+    const avoidTolls = document.getElementById('chkTolls').checked;
+    const avoidFerries = document.getElementById('chkFerries').checked;
     const targetValue = parseFloat(routeValueInput.value);
     
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Vloeiende rondritten berekenen...</div>';
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Intelligente tochten genereren & doorzoeken...</div>';
     routesSidebar.style.display = 'block';
 
     let routeOptions = [];
     let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
 
     if (isLoop) {
-      let targetKm = currentPreference === 'time' ? targetValue * 50 : targetValue;
+      // Doelafstand in km (uitgaande van gemiddeld 45 km/u landelijke snelheid bij tijd, of direct de km's)
+      let targetKm = currentPreference === 'time' ? targetValue * 45 : targetValue;
       
-      let radiusKm = (targetKm / (2 * Math.PI)) * 0.75;
-      let radiusLat = radiusKm / 111;
-      let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
-
-      let variations = [
-        { name: "Rondrit Noorden", dirAngle: Math.PI / 2 },
-        { name: "Rondrit Oosten", dirAngle: 0 },
-        { name: "Rondrit Westen", dirAngle: Math.PI }
-      ];
-
-      for (let i = 0; i < variations.length; i++) {
-        let v = variations[i];
+      // Bouw een matrix van 12 windrichtingen/hoeken om een echte menselijke planning te simuleren
+      // We genereren asymmetrische lussen (klaverblad/kruis-vormen) om overlappingen op de heen- en terugweg te vermijden
+      let candidateConfigs = [];
+      let numDirections = 8; // 8 hoofdrichtingen
+      
+      for (let i = 0; i < numDirections; i++) {
+        let baseAngle = (i * 2 * Math.PI) / numDirections;
         
-        let centerLat = userLat + (radiusLat * Math.sin(v.dirAngle));
-        let centerLon = userLon + (radiusLon * Math.cos(v.dirAngle));
+        // Straal van de lus is ongeveer 30% van de totale gewenste afstand (zodat de omtrek klopt)
+        let radiusKm = (targetKm / Math.PI) * 0.38;
+        let radiusLat = radiusKm / 111;
+        let radiusLon = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
 
-        let waypoints = [`${userLon},${userLat}`];
-        let radiuses = [`200`];
+        // Asymmetrisch punt uit (heenweg) en punt terug (terugweg via een andere boog)
+        let outAngle = baseAngle;
+        let backAngle = baseAngle + Math.PI * 0.65; // Versprongen om dubbele wegen te vermijden
 
-        let numPoints = 4;
-        for (let j = 0; j < numPoints; j++) {
-          let angle = j * (2 * Math.PI / numPoints);
-          let pLat = centerLat + (radiusLat * Math.sin(angle));
-          let pLon = centerLon + (radiusLon * Math.cos(angle));
-          waypoints.push(`${pLon},${pLat}`);
-          radiuses.push(`500`);
-        }
-        waypoints.push(`${userLon},${userLat}`);
-        radiuses.push(`200`);
+        let outLat = userLat + (radiusLat * Math.sin(outAngle));
+        let outLon = userLon + (radiusLon * Math.cos(outAngle));
+        
+        let sideLat = userLat + (radiusLat * 0.7 * Math.sin(baseAngle + Math.PI/2));
+        let sideLon = userLon + (radiusLon * 0.7 * Math.cos(baseAngle + Math.PI/2));
 
-        let waypointsStr = waypoints.join(';');
-        let radiusesStr = radiuses.join(';');
+        candidateConfigs.push({
+          name: getCompassName(i),
+          waypoints: [
+            `${userLon},${userLat}`,
+            `${sideLon},${sideLat}`,
+            `${outLon},${outLat}`,
+            `${userLon},${userLat}`
+          ]
+        });
+      }
 
-        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson&radiuses=${radiusesStr}`;
-        if (avoidHighways) {
-          url += "&exclude=motorway";
+      // Voer asynchrone berekeningen uit voor al deze combinaties achter de schermen
+      let evaluatedRoutes = [];
+      for (let config of candidateConfigs) {
+        let waypointsStr = config.waypoints.join(';');
+        let url = `${serverBase}${waypointsStr}?overview=full&geometries=geojson`;
+        
+        let excludes = [];
+        if (avoidHighways) excludes.push('motorway');
+        if (avoidTolls) excludes.push('toll');
+        if (avoidFerries) excludes.push('ferry');
+        if (excludes.length > 0) {
+          url += `&exclude=${excludes.join(',')}`;
         }
 
         try {
@@ -1051,22 +1065,50 @@ app_html = """
           let data = await response.json();
           if (data.routes && data.routes.length > 0) {
             let r = data.routes[0];
-            routeOptions.push({
-              name: v.name,
-              distance: (r.distance / 1000).toFixed(1),
-              duration: (r.duration / 3600).toFixed(1),
-              geometry: r.geometry,
-              color: i === 0 ? '#3b82f6' : (i === 1 ? '#10b981' : '#f59e0b')
-            });
+            let distKm = r.distance / 1000;
+            let durHours = r.duration / 3600;
+            
+            // Score berekenen op basis van hoe dicht de route bij de wens van de gebruiker ligt
+            let diff = Math.abs(distKm - targetKm);
+            
+            // Controleer op overlap / boomerang effect (heen en terug over dezelfde weg)
+            // Eigen software logica: als de coördinaten in het midden te dicht bij elkaar liggen, straffen we de route af
+            let hasOverlap = checkRouteOverlap(r.geometry.coordinates);
+
+            if (!hasOverlap && distKm > 3) {
+              evaluatedRoutes.push({
+                name: `Rondrit ${config.name}`,
+                distance: distKm.toFixed(1),
+                duration: durHours.toFixed(1),
+                geometry: r.geometry,
+                score: diff,
+                rawDist: distKm
+              });
+            }
           }
         } catch(e) { console.error(e); }
       }
+
+      // Sorteer op beste match met de wens van de gebruiker en neem de top 3 unieke toeren
+      evaluatedRoutes.sort((a, b) => a.score - b.score);
+      
+      // Kleuren toewijzen aan de top tochten
+      let colors = ['#1e293b', '#3b82f6', '#10b981'];
+      evaluatedRoutes.slice(0, 3).forEach((r, idx) => {
+        r.color = colors[idx] || '#64748b';
+        routeOptions.push(r);
+      });
+
     } else {
       if (!destLat || !destLon) { destLat = userLat + 0.05; destLon = userLon + 0.05; }
       
       let url = `${serverBase}${userLon},${userLat};${destLon},${destLat}?alternatives=true&overview=full&geometries=geojson`;
-      if (avoidHighways) {
-        url += "&exclude=motorway";
+      let excludes = [];
+      if (avoidHighways) excludes.push('motorway');
+      if (avoidTolls) excludes.push('toll');
+      if (avoidFerries) excludes.push('ferry');
+      if (excludes.length > 0) {
+        url += `&exclude=${excludes.join(',')}`;
       }
 
       try {
@@ -1089,16 +1131,40 @@ app_html = """
     renderRouteResults(routeOptions);
   }
 
+  // Hulpmiddel om windrichting-namen te geven
+  function getCompassName(index) {
+    const names = ["Noorden", "Noordoosten", "Oosten", "Zuidoosten", "Zuidwesten", "Westen", "Noordwesten", "Mergelland"];
+    return names[index % names.length];
+  }
+
+  // Eigen software logica om te controleren of een rondrit over dezelfde weg terugkeert
+  function checkRouteOverlap(coords) {
+    if (!coords || coords.length < 10) return false;
+    let midIndex = Math.floor(coords.length / 2);
+    let startPoint = coords[0];
+    let endPoint = coords[coords.length - 1];
+    
+    // Check of er punten op de helft van de route extreem dicht bij het begin liggen (wat duidt op direct op en neer rijden)
+    let closePointsCount = 0;
+    for (let i = Math.floor(coords.length * 0.2); i < Math.floor(coords.length * 0.8); i++) {
+      let d = calculateDistance(startPoint[1], startPoint[0], coords[i][1], coords[i][0]);
+      if (d < 0.8 && i > 5 && i < coords.length - 5) {
+        closePointsCount++;
+      }
+    }
+    return closePointsCount > 15; // Te veeloverlapping in het midden = afkeuren
+  }
+
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Probeer een andere afstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen geschikte rondritten gevonden binnen deze criteria. Probeer een andere afstand of vink minder beperkingen aan.</div>';
       return;
     }
 
     let html = '';
     routes.forEach((route, index) => {
       let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-      let polyline = L.polyline(coords, { color: route.color, weight: index === 0 ? 6 : 4, opacity: 0.8 }).addTo(map);
+      let polyline = L.polyline(coords, { color: route.color, weight: index === 0 ? 6 : 4, opacity: 0.85 }).addTo(map);
       activeRouteLayers.push(polyline);
 
       polyline.on('click', () => { selectRouteCard(index); });
