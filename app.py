@@ -28,7 +28,7 @@ app_html = """
 <style>
   body, html { margin: 0; padding: 0; width: 100%; height: 100vh; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-  .search-wrapper { position: fixed; top: 24px; right: 24px; z-index: 99999; width: 410px; }
+  .search-wrapper { position: fixed; top: 24px; right: 24px; z-index: 99999; width: 420px; }
   .search-container { display: flex; align-items: center; background: #ffffff; width: 100%; height: 56px; border-radius: 50px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3); padding-left: 18px; box-sizing: border-box; }
   .search-icon-badge { width: 32px; height: 32px; background-color: #1e293b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; flex-shrink: 0; }
   .search-icon-badge svg { width: 16px; height: 16px; fill: #ffffff; }
@@ -43,11 +43,16 @@ app_html = """
   .options-panel { display: none; background: #ffffff; width: 100%; margin-top: 10px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); padding: 20px; box-sizing: border-box; border: 1px solid rgba(0,0,0,0.06); }
   .option-group { margin-bottom: 14px; }
   .option-group label { display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 4px; text-transform: uppercase; }
-  .input-with-icon { display: flex; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; height: 44px; }
+  .input-with-icon { display: flex; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; height: 44px; position: relative; }
   .field-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; flex-shrink: 0; }
   .field-icon.black { background-color: #1e293b; }
   .field-icon.black svg { fill: #ffffff; width: 12px; height: 12px; }
+  .field-icon.red { background-color: #ef4444; }
+  .field-icon.red svg { fill: #ffffff; width: 12px; height: 12px; }
   .option-input { width: 100%; border: none; background: transparent; font-size: 14px; color: #1e293b; outline: none; }
+  .mode-selector { display: flex; background: #f1f5f9; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+  .mode-btn { flex: 1; text-align: center; padding: 8px; font-size: 13px; font-weight: 600; color: #64748b; border-radius: 9px; cursor: pointer; transition: all 0.2s; border: none; background: transparent; }
+  .mode-btn.active { background: #ffffff; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
   .checkbox-group { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
   .checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #334155; cursor: pointer; }
   .checkbox-label input { width: 16px; height: 16px; accent-color: #1e293b; cursor: pointer; }
@@ -65,13 +70,6 @@ app_html = """
   .modal-card { background: #ffffff; width: 360px; border-radius: 24px; padding: 24px; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4); box-sizing: border-box; }
   .modal-title { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
   .modal-subtitle { font-size: 13px; color: #64748b; margin-bottom: 16px; }
-  .preference-container { display: flex; gap: 12px; margin-bottom: 18px; }
-  .pref-option { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; border: 2px solid #e2e8f0; border-radius: 14px; cursor: pointer; background: #f8fafc; }
-  .pref-option input { display: none; }
-  .pref-option span { font-size: 14px; font-weight: 600; color: #334155; margin-top: 6px; }
-  .pref-option svg { width: 20px; height: 20px; stroke: #64748b; stroke-width: 2; fill: none; }
-  .pref-option.selected { border-color: #1e293b; background: #f1f5f9; }
-  .pref-option.selected svg, .pref-option.selected span { color: #1e293b; stroke: #1e293b; }
   .value-input-group { margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; }
   .value-input-group label { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; }
   .number-input-wrapper { display: flex; align-items: center; justify-content: space-between; }
@@ -87,7 +85,7 @@ app_html = """
 
 <div id="routesSidebar" class="routes-sidebar">
   <div class="routes-header">
-    <div class="routes-title">Gegarandeerde Toeren</div>
+    <div class="routes-title" id="sidebarTitle">Gegarandeerde Toeren</div>
     <button class="close-sidebar" onclick="closeRoutesSidebar()">&times;</button>
   </div>
   <div id="routesListContainer"></div>
@@ -102,26 +100,38 @@ app_html = """
     <button class="expand-btn" id="expandBtn" title="Opties weergeven">
       <svg id="arrowIcon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </button>
-    <button class="search-btn" onclick="openRouteModal()">
+    <button class="search-btn" onclick="handleSearchClick()">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
     </button>
   </div>
 
   <div id="optionsPanel" class="options-panel">
-    <div class="option-group" id="startGroup">
+    <div class="mode-selector">
+      <button class="mode-btn active" id="modeLoopBtn" onclick="setRouteMode('loop')">Rondrit (Lus)</button>
+      <button class="mode-btn" id="modePointBtn" onclick="setRouteMode('point')">Start ➔ Eind</button>
+    </div>
+
+    <div class="option-group">
       <label>Vertrekpunt</label>
       <div class="input-with-icon">
         <div class="field-icon black">
           <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         </div>
-        <input type="text" id="startInput" class="option-input" value="Locatie ophalen..." autocomplete="off">
+        <input type="text" id="startInput" class="option-input" placeholder="Startlocatie..." autocomplete="off">
+      </div>
+    </div>
+
+    <div class="option-group" id="endGroup" style="display: none;">
+      <label>Eindbestemming</label>
+      <div class="input-with-icon">
+        <div class="field-icon red">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </div>
+        <input type="text" id="endInput" class="option-input" placeholder="Waar wil je naartoe?" autocomplete="off">
       </div>
     </div>
 
     <div class="checkbox-group">
-      <label class="checkbox-label">
-        <input type="checkbox" id="chkLoop" checked disabled> Strikte Rondrit (Lus)
-      </label>
       <label class="checkbox-label">
         <input type="checkbox" id="chkHighways" checked> Autostrades vermijden
       </label>
@@ -143,24 +153,17 @@ app_html = """
       Rondrit Configuratie
       <button class="close-modal" onclick="closeRouteModal()">&times;</button>
     </div>
-    <div class="modal-subtitle">Hoe lang moet de lus zijn?</div>
-
-    <div class="preference-container">
-      <label class="pref-option selected" id="optDistance">
-        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
-        <span>Afstand</span>
-      </label>
-    </div>
+    <div class="modal-subtitle">Hoe lang moet de lus ongeveer zijn?</div>
 
     <div class="value-input-group">
       <label>Gewenste afstand</label>
       <div class="number-input-wrapper">
-        <input type="number" id="routeValueInput" value="30" min="2" max="200" step="1">
+        <input type="number" id="routeValueInput" value="30" min="2" max="300" step="1">
         <span class="unit-label">km</span>
       </div>
     </div>
 
-    <button class="depart-btn" onclick="startNavigation()">Bereken Toer (Altijd Resultaat)</button>
+    <button class="depart-btn" onclick="startNavigation()">Bereken Lus</button>
   </div>
 </div>
 
@@ -169,12 +172,20 @@ app_html = """
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
   let startMarker = null;
+  let endMarker = null;
   let activeRouteLayers = [];
-  let userLat = 50.8280;
-  let userLon = 3.2648;
+  
+  let startLat = 50.8280;
+  let startLon = 3.2648;
+  let endLat = null;
+  let endLon = null;
+
+  let currentMode = 'loop'; // 'loop' of 'point'
 
   const input = document.getElementById('searchInput');
   const startInput = document.getElementById('startInput');
+  const endInput = document.getElementById('endInput');
+  const endGroup = document.getElementById('endGroup');
   const suggestionsBox = document.getElementById('suggestions');
   const expandBtn = document.getElementById('expandBtn');
   const optionsPanel = document.getElementById('optionsPanel');
@@ -184,33 +195,60 @@ app_html = """
   const routesSidebar = document.getElementById('routesSidebar');
   const routesListContainer = document.getElementById('routesListContainer');
   const routeValueInput = document.getElementById('routeValueInput');
+  const sidebarTitle = document.getElementById('sidebarTitle');
 
+  let activeField = 'main'; // 'main', 'start', 'end'
   let timeoutId = null;
 
   function updateMapMarkers() {
     if (startMarker) map.removeLayer(startMarker);
+    if (endMarker) map.removeLayer(endMarker);
+
     const blackIcon = L.divIcon({
       className: 'custom-marker',
       html: '<div style="background-color: #1e293b; width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div></div>',
       iconSize: [26, 26],
       iconAnchor: [13, 13]
     });
-    startMarker = L.marker([userLat, userLon], { icon: blackIcon }).addTo(map);
-    map.setView([userLat, userLon], 13);
+
+    const redIcon = L.divIcon({
+      className: 'custom-marker',
+      html: '<div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div></div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    startMarker = L.marker([startLat, startLon], { icon: blackIcon }).addTo(map);
+    if (currentMode === 'point' && endLat !== null && endLon !== null) {
+      endMarker = L.marker([endLat, endLon], { icon: redIcon }).addTo(map);
+      let group = L.featureGroup([startMarker, endMarker]);
+      map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    } else {
+      map.setView([startLat, startLon], 13);
+    }
   }
 
+  // Geolocation bij opstarten
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        userLat = pos.coords.latitude;
-        userLon = pos.coords.longitude;
+        startLat = pos.coords.latitude;
+        startLon = pos.coords.longitude;
         updateMapMarkers();
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1`, { headers: { 'Accept-Language': 'nl' } })
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${startLat}&lon=${startLon}&addressdetails=1`, { headers: { 'Accept-Language': 'nl' } })
           .then(res => res.json())
-          .then(data => { startInput.value = data.display_name || `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`; })
-          .catch(() => { startInput.value = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`; });
+          .then(data => {
+            let addr = data.display_name || `${startLat.toFixed(4)}, ${startLon.toFixed(4)}`;
+            startInput.value = addr;
+            input.value = addr;
+          })
+          .catch(() => {
+            let def = `${startLat.toFixed(4)}, ${startLon.toFixed(4)}`;
+            startInput.value = def;
+            input.value = def;
+          });
       },
-      () => { startInput.value = "Lendelede, België"; updateMapMarkers(); },
+      () => { startInput.value = "Lendelede, België"; input.value = "Lendelede, België"; updateMapMarkers(); },
       { timeout: 10000, enableHighAccuracy: true }
     );
   } else { updateMapMarkers(); }
@@ -221,65 +259,82 @@ app_html = """
     arrowIcon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
   });
 
-  input.addEventListener('input', () => {
-    const query = input.value.trim();
-    if (query.length < 2) { suggestionsBox.style.display = 'none'; return; }
-    
-    mainSearchContainer.appendChild(suggestionsBox);
-    suggestionsBox.style.top = '62px'; suggestionsBox.style.left = '0px'; suggestionsBox.style.width = '100%';
+  function setRouteMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeLoopBtn').classList.toggle('active', mode === 'loop');
+    document.getElementById('modePointBtn').classList.toggle('active', mode === 'point');
+    endGroup.style.display = (mode === 'point') ? 'block' : 'none';
+    updateMapMarkers();
+  }
 
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=be`, { headers: { 'Accept-Language': 'nl' } })
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.length > 0) {
-            let html = '';
-            data.forEach(item => {
-              const name = item.display_name.replace(/'/g, "\\'");
-              html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${item.lat}, ${item.lon})"><span>${item.display_name}</span></div>`;
-            });
-            suggestionsBox.innerHTML = html;
-            suggestionsBox.style.display = 'block';
-          } else { suggestionsBox.style.display = 'none'; }
-        });
-    }, 250);
-  });
+  // Zoekfunctionaliteitkoppeling voor alle drie de velden
+  setupAutocomplete(input, 'main');
+  setupAutocomplete(startInput, 'start');
+  setupAutocomplete(endInput, 'end');
 
-  function selectSuggestion(val, lat, lon) {
-    input.value = val;
-    startInput.value = val;
-    userLat = parseFloat(lat);
-    userLon = parseFloat(lon);
+  function setupAutocomplete(field, fieldType) {
+    field.addEventListener('input', () => {
+      activeField = fieldType;
+      const query = field.value.trim();
+      if (query.length < 2) { suggestionsBox.style.display = 'none'; return; }
+
+      mainSearchContainer.appendChild(suggestionsBox);
+      suggestionsBox.style.top = '62px'; suggestionsBox.style.left = '0px'; suggestionsBox.style.width = '100%';
+
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=be`, { headers: { 'Accept-Language': 'nl' } })
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              let html = '';
+              data.forEach(item => {
+                const name = item.display_name.replace(/'/g, "\\'");
+                html += `<div class="suggestion-item" onclick="selectSuggestion('${name}', ${item.lat}, ${item.lon}, '${fieldType}')"><span>${item.display_name}</span></div>`;
+              });
+              suggestionsBox.innerHTML = html;
+              suggestionsBox.style.display = 'block';
+            } else { suggestionsBox.style.display = 'none'; }
+          });
+      }, 250);
+    });
+  }
+
+  window.selectSuggestion = function(val, lat, lon, fieldType) {
+    if (fieldType === 'main' || fieldType === 'start') {
+      input.value = val;
+      startInput.value = val;
+      startLat = parseFloat(lat);
+      startLon = parseFloat(lon);
+    } else if (fieldType === 'end') {
+      endInput.value = val;
+      endLat = parseFloat(lat);
+      endLon = parseFloat(lon);
+    }
     updateMapMarkers();
     suggestionsBox.style.display = 'none';
   }
 
-  function openRouteModal() { routeModal.style.display = 'flex'; }
+  function handleSearchClick() {
+    if (currentMode === 'loop') {
+      routeModal.style.display = 'flex';
+    } else {
+      startNavigation();
+    }
+  }
+
   function closeRouteModal() { routeModal.style.display = 'none'; }
   function closeRoutesSidebar() { routesSidebar.style.display = 'none'; clearRoutes(); }
   function clearRoutes() { activeRouteLayers.forEach(l => map.removeLayer(l)); activeRouteLayers = []; }
 
-  function getDistanceKm(lat1, lon1, lat2, lon2) {
-    let R = 6371;
-    let dLat = (lat2 - lat1) * (Math.PI / 180);
-    let dLon = (lon2 - lon1) * (Math.PI / 180);
-    let a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)*Math.sin(dLon/2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  // --- 100% GEGARANDEERDE ENGINE MET CHECKBOX FILTERING ---
+  // --- ACCURATE EN GEGARANDEERDE ROUTE ENGINE ---
   async function startNavigation() {
     closeRouteModal();
     clearRoutes();
 
-    const targetKm = parseFloat(routeValueInput.value);
     const avoidHighways = document.getElementById('chkHighways').checked;
     const avoidTolls = document.getElementById('chkTolls').checked;
     const avoidFerries = document.getElementById('chkFerries').checked;
-
-    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Toer berekenen met actieve vinkjes...</div>';
-    routesSidebar.style.display = 'block';
 
     let serverBase = "https://routing.openstreetmap.de/routed-car/route/v1/driving/";
     let excludes = [];
@@ -287,60 +342,45 @@ app_html = """
     if (avoidTolls) excludes.push('toll');
     if (avoidFerries) excludes.push('ferry');
 
-    let candidateConfigs = [];
-    let numDirections = 8;
-    
-    // Bouw varianten op basis van de gewenste afstand
-    for (let i = 0; i < numDirections; i++) {
-      let angle = (i * 2 * Math.PI) / numDirections;
-      let radius = (targetKm / Math.PI) * 0.38;
-      let rLat = radius / 111;
-      let rLon = radius / (111 * Math.cos(userLat * Math.PI / 180));
-
-      let p1Lat = userLat + (rLat * Math.sin(angle));
-      let p1Lon = userLon + (rLon * Math.cos(angle));
-      let p2Lat = userLat + (rLat * 0.7 * Math.sin(angle + Math.PI * 0.7));
-      let p2Lon = userLon + (rLon * 0.7 * Math.cos(angle + Math.PI * 0.7));
-
-      candidateConfigs.push({
-        name: `Lus ${i+1}`,
-        waypoints: [
-          `${userLon},${userLat}`,
-          `${p1Lon},${p1Lat}`,
-          `${p2Lon},${p2Lat}`,
-          `${userLon},${userLat}`
-        ]
-      });
-    }
+    routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#64748b;">Routes berekenen...</div>';
+    routesSidebar.style.display = 'block';
 
     let evaluatedRoutes = [];
 
-    // Poging 1: Strikte routering met alle vinkjes gerespecteerd
-    for (let config of candidateConfigs) {
-      let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
-      if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
+    if (currentMode === 'loop') {
+      sidebarTitle.innerText = "Gegarandeerde Lussen";
+      let targetKm = parseFloat(routeValueInput.value);
+      
+      // Nauwkeurigere straalberekening voor lussen (omtrek ~ targetKm)
+      let radius = targetKm / 6.28; 
+      let rLat = radius / 111;
+      let rLon = radius / (111 * Math.cos(startLat * Math.PI / 180));
 
-      try {
-        let res = await fetch(url);
-        let data = await res.json();
-        if (data.routes && data.routes.length > 0) {
-          let r = data.routes[0];
-          let distKm = r.distance / 1000;
-          evaluatedRoutes.push({
-            name: config.name,
-            distance: distKm.toFixed(1),
-            duration: (r.duration / 3600).toFixed(1),
-            geometry: r.geometry,
-            score: Math.abs(distKm - targetKm)
-          });
-        }
-      } catch(e) {}
-    }
+      let angles = [0, 1.25, 2.5, 3.76, 5.0]; // Diverse windrichtingen voor variatie
+      let candidateConfigs = [];
 
-    // GEGARANDEERDE FALLBACK: Als vinkjes of afstanden geen resultaat gaven, draaien we direct een soepele fallback zonder excludes
-    if (evaluatedRoutes.length === 0) {
+      angles.forEach((ang, idx) => {
+        let p1Lat = startLat + (rLat * Math.sin(ang));
+        let p1Lon = startLon + (rLon * Math.cos(ang));
+        let p2Lat = startLat + (rLat * 1.1 * Math.sin(ang + 2.1));
+        let p2Lon = startLon + (rLon * 1.1 * Math.cos(ang + 2.1));
+
+        candidateConfigs.push({
+          name: `Lus ${idx+1}`,
+          waypoints: [
+            `${startLon},${startLat}`,
+            `${p1Lon},${p1Lat}`,
+            `${p2Lon},${p2Lat}`,
+            `${startLon},${startLat}`
+          ]
+        });
+      });
+
+      // Poging 1: Met filters
       for (let config of candidateConfigs) {
         let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
+        if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
+
         try {
           let res = await fetch(url);
           let data = await res.json();
@@ -348,7 +388,7 @@ app_html = """
             let r = data.routes[0];
             let distKm = r.distance / 1000;
             evaluatedRoutes.push({
-              name: `${config.name} (Flex)`,
+              name: config.name,
               distance: distKm.toFixed(1),
               duration: (r.duration / 3600).toFixed(1),
               geometry: r.geometry,
@@ -357,16 +397,84 @@ app_html = """
           }
         } catch(e) {}
       }
-    }
 
-    // Sorteer op beste benadering van het aantal kilometers
-    evaluatedRoutes.sort((a, b) => a.score - b.score);
-    renderRouteResults(evaluatedRoutes.slice(0, 3));
+      // Fallback zonder filters indien nodig
+      if (evaluatedRoutes.length === 0) {
+        for (let config of candidateConfigs) {
+          let url = `${serverBase}${config.waypoints.join(';')}?overview=full&geometries=geojson`;
+          try {
+            let res = await fetch(url);
+            let data = await res.json();
+            if (data.routes && data.routes.length > 0) {
+              let r = data.routes[0];
+              let distKm = r.distance / 1000;
+              evaluatedRoutes.push({
+                name: `${config.name} (Flex)`,
+                distance: distKm.toFixed(1),
+                duration: (r.duration / 3600).toFixed(1),
+                geometry: r.geometry,
+                score: Math.abs(distKm - targetKm)
+              });
+            }
+          } catch(e) {}
+        }
+      }
+
+      evaluatedRoutes.sort((a, b) => a.score - b.score);
+      renderRouteResults(evaluatedRoutes.slice(0, 3));
+
+    } else {
+      sidebarTitle.innerText = "Start ➔ Eindroutes";
+      if (endLat === null || endLon === null) {
+        routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Selecteer eerst een geldige eindbestemming.</div>';
+        return;
+      }
+
+      let waypoints = [`${startLon},${startLat}`, `${endLon},${endLat}`];
+      let url = `${serverBase}${waypoints.join(';')}?alternatives=true&overview=full&geometries=geojson`;
+      if (excludes.length > 0) url += `&exclude=${excludes.join(',')}`;
+
+      try {
+        let res = await fetch(url);
+        let data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          data.routes.forEach((r, idx) => {
+            evaluatedRoutes.push({
+              name: `Optie ${idx+1}`,
+              distance: (r.distance / 1000).toFixed(1),
+              duration: (r.duration / 3600).toFixed(1),
+              geometry: r.geometry
+            });
+          });
+        }
+      } catch(e) {}
+
+      // Fallback als punt-tot-punt met vinkjes faalt
+      if (evaluatedRoutes.length === 0) {
+        let fallbackUrl = `${serverBase}${waypoints.join(';')}?alternatives=true&overview=full&geometries=geojson`;
+        try {
+          let res = await fetch(fallbackUrl);
+          let data = await res.json();
+          if (data.routes && data.routes.length > 0) {
+            data.routes.forEach((r, idx) => {
+              evaluatedRoutes.push({
+                name: `Optie ${idx+1} (Flex)`,
+                distance: (r.distance / 1000).toFixed(1),
+                duration: (r.duration / 3600).toFixed(1),
+                geometry: r.geometry
+              });
+            });
+          }
+        } catch(e) {}
+      }
+
+      renderRouteResults(evaluatedRoutes);
+    }
   }
 
   function renderRouteResults(routes) {
     if (routes.length === 0) {
-      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes beschikbaar voor deze locatie. Probeer een andere afstand.</div>';
+      routesListContainer.innerHTML = '<div style="text-align:center; padding: 20px; color:#ef4444;">Geen routes gevonden. Pas je opties aan.</div>';
       return;
     }
 
